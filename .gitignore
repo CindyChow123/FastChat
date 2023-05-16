@@ -22,3 +22,9 @@ output
 # Data
 *.pkl
 *.csv
+
+# Docker
+*.yml
+Dockerfile
+.dockerignore
+requirements.txt
