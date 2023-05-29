@@ -22,9 +22,13 @@ output
 # Data
 *.pkl
 *.csv
+datasets
 
 # Docker
 *.yml
 Dockerfile
 .dockerignore
 requirements.txt
+
+## Model
+output*

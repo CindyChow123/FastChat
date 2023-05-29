@@ -1,0 +1,2 @@
+#!/bin/bash
+python /TTS_personal_jiahui.ni/Im-sys/FastChat/output_7b_ckp/zero_to_fp32.py /TTS_personal_jiahui.ni/Im-sys/FastChat/output_7b_ckp /TTS_personal_jiahui.ni/Im-sys/FastChat/output_7b_ckp/pytorch_model.bin

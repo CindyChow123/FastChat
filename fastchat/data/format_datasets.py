@@ -4,6 +4,8 @@ from tqdm import tqdm
 
 from datasets import load_dataset
 
+dir = "../datasets/"
+
 def JsonSingleData(data):
     js = json.dumps(data,indent=4,separators=(',',':'))
     return js
@@ -57,7 +59,7 @@ def main():
     elif(args.dataset_name == "allenai/prosocial-dialog"):
         for key in dataset.shape.keys():
             output = format_prosocial_dialog(dataset[key])
-            json.dump(output,open(key+"_"+args.out_file,"w"),indent=2)
+            json.dump(output,open(dir+key+"_"+args.out_file,"w"),indent=2)
             print(f'{key}:{len(output)}')
 
     

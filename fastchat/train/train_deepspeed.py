@@ -18,21 +18,30 @@ from dataclasses import dataclass, field
 import json
 import pathlib
 from typing import Dict, Optional, Sequence
+import random
+import math
+import os
+import time
+import sys
+# Must before fastchat importing
+sys.path.append("/TTS_personal_jiahui.ni/Im-sys/FastChat/")
+
 
 import numpy as np
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
+from torch.utils.data.distributed import DistributedSampler
 import transformers
-from transformers import Trainer
 from transformers.trainer_pt_utils import LabelSmoother
-
-import sys
-sys.path.append("/TTS_personal_jiahui.ni/Im-sys/FastChat/")
 
 from fastchat.conversation import SeparatorStyle
 from fastchat.model.model_adapter import get_conversation_template
 
+from transformers.deepspeed import HfDeepSpeedConfig
+import deepspeed
+
 IGNORE_TOKEN_ID = LabelSmoother.ignore_index
+date = time.strftime("%m%d%H%M")
 
 
 @dataclass
@@ -58,13 +67,21 @@ class TrainingArguments(transformers.TrainingArguments):
             "help": "Maximum sequence length. Sequences will be right padded (and possibly truncated)."
         },
     )
-    should_save: bool = field(
-        default = True,
-        metadata={"help":"Whether to save the model after training."}
+    ds_config_path: str = field(
+        default=None,
+        metadata={"help":"Path of deepspeed config json."}
     )
 
+def set_random_seed(seed):
+    if seed is not None:
+        transformers.set_seed(seed)
+        random.seed(seed)
+        np.random.seed(seed)
+        torch.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
 
 local_rank = None
+training_args = None
 
 
 def rank0_print(*args):
@@ -79,6 +96,48 @@ def safe_save_model_for_hf_trainer(trainer: transformers.Trainer, output_dir: st
         cpu_state_dict = {key: value.cpu() for key, value in state_dict.items()}
         del state_dict
         trainer._save(output_dir, state_dict=cpu_state_dict)  # noqa
+
+def save_hf_format(model, tokenizer, sub_folder=""):
+    # used to save huggingface format, so we can use it for hf.from_pretrained
+    model_to_save = model.module if hasattr(model, 'module') else model
+    CONFIG_NAME = "config.json"
+    WEIGHTS_NAME = "pytorch_model.bin"
+    output_dir = os.path.join(training_args.output_dir, sub_folder)
+    os.makedirs(output_dir, exist_ok=True)
+    output_model_file = os.path.join(output_dir, WEIGHTS_NAME)
+    output_config_file = os.path.join(output_dir, CONFIG_NAME)
+    save_dict = model_to_save.state_dict()
+    torch.save(save_dict, output_model_file)
+    model_to_save.config.to_json_file(output_config_file)
+    tokenizer.save_vocabulary(output_dir)
+    torch.save(training_args,os.path.join(output_dir,"training_args.bin"))
+
+def get_optimizer_grouped_parameters(model,
+                                     weight_decay,
+                                     no_decay_name_list=[
+                                         "bias", "LayerNorm.weight"
+                                     ]):
+    optimizer_grouped_parameters = [
+        {
+            "params": [
+                p for n, p in model.named_parameters()
+                if (not any(nd in n
+                            for nd in no_decay_name_list) and p.requires_grad)
+            ],
+            "weight_decay":
+            weight_decay,
+        },
+        {
+            "params": [
+                p for n, p in model.named_parameters()
+                if (any(nd in n
+                        for nd in no_decay_name_list) and p.requires_grad)
+            ],
+            "weight_decay":
+            0.0,
+        },
+    ]
+    return optimizer_grouped_parameters
 
 
 def preprocess(
@@ -236,20 +295,64 @@ def make_supervised_data_module(
     eval_dataset = dataset_cls(eval_raw_data, tokenizer=tokenizer)
     return dict(train_dataset=train_dataset, eval_dataset=eval_dataset)
 
+def eval(model, eval_dataloader,epoch):
+    model.eval()
+    losses = 0
+    rank0_print(f"***** Evaluating Epoch {epoch+1}/{training_args.num_train_epochs} *****",
+            model.local_rank)
+    for step, batch in enumerate(eval_dataloader):
+        batch = batch.to(model.local_rank)
+        with torch.no_grad():
+            outputs = model(**batch)
+        
+        loss = outputs.loss
+        losses += loss.float()
+    losses = losses/step+1
+    rank0_print(f"Eval losses: {losses}")
+    
+def train(model,tokenizer, train_dataloader, eval_dataloader):
+    eval(model=model,eval_dataloader=eval_dataloader,epoch=0)
+    for epoch in range(int(training_args.num_train_epochs)):
+        rank0_print(f"Beginning of Epoch {epoch+1}/{training_args.num_train_epochs}, Total Micro Batches {len(train_dataloader)}",
+            model.local_rank)
+        model.train()
+        for step, batch in enumerate(train_dataloader):
+            batch = batch.to(model.local_rank)
+            outputs = model(**batch)
+            loss = outputs.loss
+            model.backward(loss)
+            model.step()
 
-def train():
+            # save and log every __ steps
+            if (step % training_args.eval_steps == 0):
+                eval(model=model,eval_dataloader=eval_dataloader,epoch=epoch)
+            if (step % training_args.save_steps == 0):
+                save_hf_format(model=model,tokenizer=tokenizer, sub_folder=date+str(step))
+    return model
+
+def main():
     global local_rank
-
+    global training_args
+    print("*****Reading arguments*****")
     parser = transformers.HfArgumentParser(
         (ModelArguments, DataArguments, TrainingArguments)
     )
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    ds_config = training_args.ds_config_path  # deepspeed config object or path to the file
+    training_args.deepspeed=ds_config
+    set_random_seed(training_args.seed)
     local_rank = training_args.local_rank
+    # keep this one alive?
+    dschf = HfDeepSpeedConfig(ds_config)
+    
+    print("*****Loading model*****")
     model = transformers.AutoModelForCausalLM.from_pretrained(
         model_args.model_name_or_path,
         cache_dir=training_args.cache_dir,
     )
     model.config.use_cache = False
+
+    print("*****Loading tokenizer*****")
     tokenizer = transformers.AutoTokenizer.from_pretrained(
         model_args.model_name_or_path,
         cache_dir=training_args.cache_dir,
@@ -258,30 +361,56 @@ def train():
         use_fast=False,
     )
     tokenizer.pad_token = tokenizer.unk_token
+    data_collator = transformers.DataCollatorWithPadding(tokenizer=tokenizer,max_length = training_args.model_max_length)
 
+    print("*****Processing dataset*****")
     data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
-    trainer = Trainer(
-        model=model, tokenizer=tokenizer, args=training_args, **data_module
+    train_dataloader = DataLoader(data_module["train_dataset"],
+                              collate_fn=data_collator,
+                              sampler = DistributedSampler(data_module["train_dataset"]),
+                              batch_size = training_args.per_device_train_batch_size)
+    eval_dataloader = DataLoader(data_module["eval_dataset"],
+                              collate_fn=data_collator,
+                              sampler = DistributedSampler(data_module["eval_dataset"]),
+                              batch_size = training_args.per_device_eval_batch_size)
+
+    
+    optimizer_grouped_parameters = get_optimizer_grouped_parameters(
+        model, training_args.weight_decay)
+    
+    optimizer = torch.optim.AdamW(optimizer_grouped_parameters,lr=training_args.learning_rate)
+
+    num_update_steps_per_epoch = math.ceil(len(data_module["train_dataset"])/training_args.gradient_accumulation_steps)
+
+    lr_scheduler = transformers.get_scheduler(
+        name=training_args.lr_scheduler_type,
+        optimizer=optimizer,
+        num_warmup_steps=training_args.warmup_ratio*num_update_steps_per_epoch, #???
+        num_training_steps = training_args.num_train_epochs * num_update_steps_per_epoch
     )
 
-    if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
-        trainer.train(resume_from_checkpoint=True)
-    else:
-        trainer.train()
-    trainer.save_state()
-    # trainer.save_model(output_dir=training_args.output_dir)
-    # trainer.deepspeed.save_checkpoint(training_args.output_dir)
-    if not trainer.deepspeed.save_16bit_model(training_args.output_dir, "pytorch_model.bin"):
-        rank0_print(
-            "deepspeed.save_16bit_model didn't save the model, since"
-            " stage3_gather_16bit_weights_on_model_save=false. Saving the full checkpoint instead, use"
-            " zero_to_fp32.py to recover weights"
-        )
-        trainer.deepspeed.save_checkpoint(training_args.output_dir)
-    else:
-        rank0_print("saved 16 bit model")
-    # safe_save_model_for_hf_trainer(trainer=trainer, output_dir=training_args.output_dir)
+    model_engine, optimizer, _, lr_scheduler = deepspeed.initialize(
+        model=model,
+        optimizer=optimizer,
+        args=training_args,
+        config=ds_config,
+        lr_scheduler=lr_scheduler)
+    
+    local_rank = model_engine.local_rank
+    
+    if training_args.gradient_checkpointing:
+        model_engine.gradient_checkpointing_enable()
+    
+    rank0_print("***** Running training *****",local_rank)
+
+    final_model = train(model=model_engine,tokenizer=tokenizer,train_dataloader=train_dataloader,eval_dataloader=eval_dataloader)
+    
+    if training_args.output_dir is not None:
+        rank0_print("Saving the final model", final_model.local_rank)
+        if(final_model.local_rank==0):
+            save_hf_format(final_model,tokenizer=tokenizer,args=training_args,sub_folder=date+"last")
+
 
 
 if __name__ == "__main__":
-    train()
+    main()

@@ -10,12 +10,7 @@ from fastchat.train.llama_flash_attn_monkey_patch import (
 
 replace_llama_attn_with_flash_attn()
 
-from fastchat.train.train import train
+from fastchat.train.train_deepspeed import main
 
 if __name__ == "__main__":
-    # print(torch.cuda.is_available())
-    # a = torch.cuda.device_count()
-    # print(a)
-    # for i in range(0,a):
-    #     print(torch.cuda.get_device_name(i))
-    train()
+    main()
