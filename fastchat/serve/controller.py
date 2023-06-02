@@ -18,6 +18,9 @@ import numpy as np
 import requests
 import uvicorn
 
+import sys
+sys.path.append("/TTS_personal_jiahui.ni/Im-sys/FastChat/")
+
 from fastchat.constants import CONTROLLER_HEART_BEAT_EXPIRATION, ErrorCode
 from fastchat.utils import build_logger, server_error_msg
 
@@ -345,7 +348,7 @@ async def worker_api_get_status(request: Request):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--host", type=str, default="localhost")
+    parser.add_argument("--host", type=str, default="0.0.0.0")
     parser.add_argument("--port", type=int, default=21001)
     parser.add_argument(
         "--dispatch-method",

@@ -17,9 +17,52 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.live import Live
 
-from fastchat.model.model_adapter import add_model_args
+import sys
+sys.path.append("/TTS_personal_jiahui.ni/Im-sys/FastChat/")
+
+from fastchat.model.model_adapter import add_model_args, get_global_rank
 from fastchat.serve.inference import chat_loop, ChatIO
 
+global_rank = None
+def rank0_print(*arg,end:str="\n",flush:bool=False):
+    """print the conversation if the global rank is 0, for multi host application"""
+    global global_rank
+    if(global_rank is None):
+        global_rank = get_global_rank()
+    if(global_rank == 0):
+        with open(args.conv_out_path,"a") as f:
+            print(*arg, end = end, flush = flush, file=f)
+
+class FileChatIO(ChatIO):
+    inputs = None
+    input_index = -1
+    def __init__(self, file_path: str) -> None:
+        super().__init__()
+        with open(file_path,"r") as f:
+            self.inputs = f.readlines()
+
+    def prompt_for_input(self, role: str) -> str:
+        if(self.input_index < len(self.inputs)-1):
+            self.input_index += 1
+            rank0_print(f"{role}: ", self.inputs[self.input_index].strip('\n'))
+            return self.inputs[self.input_index]
+        else:
+            return None
+        
+    def prompt_for_output(self, role: str):
+        rank0_print(f"{role}: ", end="", flush=True)
+        
+    def stream_output(self, output_stream):
+        pre = 0
+        for outputs in output_stream:
+            output_text = outputs["text"]
+            output_text = output_text.strip().split(" ")
+            now = len(output_text) - 1
+            if now > pre:
+                rank0_print(" ".join(output_text[pre:now]), end=" ", flush=True)
+                pre = now
+        rank0_print(" ".join(output_text[pre:]), flush=True)
+        return " ".join(output_text)
 
 class SimpleChatIO(ChatIO):
     def prompt_for_input(self, role) -> str:
@@ -115,6 +158,8 @@ def main(args):
         chatio = SimpleChatIO()
     elif args.style == "rich":
         chatio = RichChatIO()
+    elif args.style == "file":
+        chatio = FileChatIO(args.conv_file)
     else:
         raise ValueError(f"Invalid style for console: {args.style}")
     try:
@@ -130,6 +175,7 @@ def main(args):
             args.max_new_tokens,
             chatio,
             args.debug,
+            args.use_deepspeed
         )
     except KeyboardInterrupt:
         print("exit...")
@@ -147,9 +193,12 @@ if __name__ == "__main__":
         "--style",
         type=str,
         default="simple",
-        choices=["simple", "rich"],
+        choices=["simple", "rich", "file"],
         help="Display style.",
     )
     parser.add_argument("--debug", action="store_true", help="Print debug information")
+    parser.add_argument("--conv-file", type=str, default=None, help="User prompt file for conversation under file chat mode")
+    parser.add_argument("--use-deepspeed", action="store_true", help="Whether using deepspeed to accelerate")
+    parser.add_argument("--conv-out-path", type=str, default=None, help="The output file path for generated conversation")
     args = parser.parse_args()
     main(args)

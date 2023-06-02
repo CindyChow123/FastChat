@@ -58,9 +58,11 @@ class TrainingArguments(transformers.TrainingArguments):
             "help": "Maximum sequence length. Sequences will be right padded (and possibly truncated)."
         },
     )
-    should_save: bool = field(
+    ckp_dir: str = field(
         default = True,
-        metadata={"help":"Whether to save the model after training."}
+        metadata = {
+            "help" : "Path to save the zero3 ckpt to recover fp32 model weights."
+        }
     )
 
 
@@ -269,18 +271,11 @@ def train():
     else:
         trainer.train()
     trainer.save_state()
-    # trainer.save_model(output_dir=training_args.output_dir)
-    # trainer.deepspeed.save_checkpoint(training_args.output_dir)
-    if not trainer.deepspeed.save_16bit_model(training_args.output_dir, "pytorch_model.bin"):
-        rank0_print(
-            "deepspeed.save_16bit_model didn't save the model, since"
-            " stage3_gather_16bit_weights_on_model_save=false. Saving the full checkpoint instead, use"
-            " zero_to_fp32.py to recover weights"
-        )
-        trainer.deepspeed.save_checkpoint(training_args.output_dir)
-    else:
-        rank0_print("saved 16 bit model")
-    # safe_save_model_for_hf_trainer(trainer=trainer, output_dir=training_args.output_dir)
+    trainer.save_model(output_dir=training_args.output_dir)
+    rank0_print("*****Saved fp16 if zero stage 3*****")
+    if(trainer.deepspeed):
+        trainer.deepspeed.save_checkpoint(training_args.ckp_dir)
+        rank0_print("*****Saved ckpt if deepseed*****")
 
 
 if __name__ == "__main__":

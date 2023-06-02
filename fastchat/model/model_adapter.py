@@ -21,6 +21,7 @@ from transformers import (
     LlamaForCausalLM,
     T5Tokenizer,
 )
+from transformers.models.llama.modeling_llama import LlamaDecoderLayer
 
 from fastchat.conversation import Conversation, get_conv_template
 from fastchat.model.compression import load_compress_model
@@ -29,6 +30,8 @@ from fastchat.model.monkey_patch_non_inplace import (
 )
 from fastchat.utils import get_gpu_memory
 
+import deepspeed
+from deepspeed import comm as dist
 
 class BaseAdapter:
     """The base and the default model adapter."""
@@ -99,6 +102,7 @@ def load_model(
     load_8bit: bool = False,
     cpu_offloading: bool = False,
     debug: bool = False,
+    use_deepspeed: bool = False,
 ):
     """Load a model from Hugging Face."""
 
@@ -108,7 +112,7 @@ def load_model(
     )
     if device == "cpu":
         kwargs = {"torch_dtype": torch.float32}
-    elif device == "cuda":
+    elif device == "cuda" and not use_deepspeed:
         kwargs = {"torch_dtype": torch.float16}
         if num_gpus != 1:
             kwargs["device_map"] = "auto"
@@ -127,6 +131,8 @@ def load_model(
         kwargs = {"torch_dtype": torch.float16}
         # Avoid bugs in mps backend by not using in-place operations.
         replace_llama_attn_with_non_inplace_operations()
+    elif use_deepspeed:
+        kwargs = {"torch_dtype": torch.float32}
     else:
         raise ValueError(f"Invalid device: {device}")
 
@@ -156,14 +162,24 @@ def load_model(
     adapter = get_model_adapter(model_path)
     model, tokenizer = adapter.load_model(model_path, kwargs)
 
-    if (device == "cuda" and num_gpus == 1 and not cpu_offloading) or device == "mps":
+    if (not use_deepspeed and device == "cuda" and num_gpus == 1 and not cpu_offloading) or device == "mps":
         model.to(device)
 
+    if (use_deepspeed):
+        model = deepspeed.init_inference(
+            model = model,
+            mp_size = num_gpus,
+            dtype = torch.float,
+            injection_policy={LlamaDecoderLayer: ('self_attn.o_proj', 'mlp.down_proj')}
+        )
     if debug:
         print(model)
 
     return model, tokenizer
 
+
+def get_global_rank() -> int:
+    return dist.get_world_rank_from_launcher()
 
 def get_conversation_template(model_path: str) -> Conversation:
     adapter = get_model_adapter(model_path)
