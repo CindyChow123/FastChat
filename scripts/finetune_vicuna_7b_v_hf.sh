@@ -23,6 +23,6 @@ python /TTS_personal_jiahui.ni/Im-sys/FastChat/fastchat/train/train.py \
     --model_max_length 2048 \
     --gradient_checkpointing True \
     --lazy_preprocess True \
-    --deepspeed /TTS_personal_jiahui.ni/Im-sys/FastChat/fastchat/train/vicuna-deepseed-hf.json \
+    --deepspeed /TTS_personal_jiahui.ni/Im-sys/FastChat/fastchat/train/vicuna-deepseed-hf-noffl.json \
     --report_to none \
 

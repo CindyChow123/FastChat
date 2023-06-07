@@ -110,6 +110,8 @@ def train():
         bias=lora_args.bias,
         task_type="CAUSAL_LM",
     )
+    model.gradient_checkpointing_enable()
+    model.enable_input_require_grads()
     model = get_peft_model(model, lora_config)
     if training_args.deepspeed is not None and training_args.local_rank == 0:
         model.print_trainable_parameters()

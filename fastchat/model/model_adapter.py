@@ -33,6 +33,8 @@ from fastchat.utils import get_gpu_memory
 import deepspeed
 from deepspeed import comm as dist
 
+from peft import PeftModel
+
 class BaseAdapter:
     """The base and the default model adapter."""
 
@@ -103,6 +105,7 @@ def load_model(
     cpu_offloading: bool = False,
     debug: bool = False,
     use_deepspeed: bool = False,
+    lora_path: Optional[str] = None,
 ):
     """Load a model from Hugging Face."""
 
@@ -160,7 +163,7 @@ def load_model(
 
     # Load model
     adapter = get_model_adapter(model_path)
-    model, tokenizer = adapter.load_model(model_path, kwargs)
+    model, tokenizer = adapter.load_model(model_path,lora_path,kwargs)
 
     if (not use_deepspeed and device == "cuda" and num_gpus == 1 and not cpu_offloading) or device == "mps":
         model.to(device)
@@ -228,7 +231,7 @@ class VicunaAdapter(BaseAdapter):
     def match(self, model_path: str):
         return "vicuna" in model_path
 
-    def load_model(self, model_path: str, from_pretrained_kwargs: dict):
+    def load_model(self, model_path: str,lora_path: str, from_pretrained_kwargs: dict):
         tokenizer = AutoTokenizer.from_pretrained(model_path, use_fast=False)
         model = AutoModelForCausalLM.from_pretrained(
             model_path,
@@ -236,6 +239,13 @@ class VicunaAdapter(BaseAdapter):
             **from_pretrained_kwargs,
         )
         self.raise_warning_for_old_weights(model)
+        if lora_path:
+            model = PeftModel.from_pretrained(
+            model,
+            lora_path, # specific checkpoint path from "Chinese-Vicuna/Chinese-Vicuna-lora-7b-belle-and-guanaco"
+            torch_dtype=torch.float16,
+            device_map={'': 0}
+        )
         return model, tokenizer
 
     def get_default_conv_template(self, model_path: str) -> Conversation:

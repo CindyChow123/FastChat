@@ -175,7 +175,8 @@ def main(args):
             args.max_new_tokens,
             chatio,
             args.debug,
-            args.use_deepspeed
+            args.use_deepspeed,
+            args.lora_path
         )
     except KeyboardInterrupt:
         print("exit...")
@@ -200,5 +201,6 @@ if __name__ == "__main__":
     parser.add_argument("--conv-file", type=str, default=None, help="User prompt file for conversation under file chat mode")
     parser.add_argument("--use-deepspeed", action="store_true", help="Whether using deepspeed to accelerate")
     parser.add_argument("--conv-out-path", type=str, default=None, help="The output file path for generated conversation")
+    parser.add_argument("--lora-path", type=str, default=None,help="Lora weight directory")
     args = parser.parse_args()
     main(args)
