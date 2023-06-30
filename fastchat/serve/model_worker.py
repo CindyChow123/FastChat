@@ -76,7 +76,7 @@ class ModelWorker:
         max_gpu_memory,
         load_8bit=False,
         cpu_offloading=False,
-        lora_path = None,
+        lora_path=None,
         gptq_config=None,
     ):
         self.controller_addr = controller_addr
@@ -94,9 +94,10 @@ class ModelWorker:
             num_gpus,
             max_gpu_memory,
             load_8bit,
-            cpu_offloading,lora_path,
+            cpu_offloading,
+            lora_path,
             gptq_config,
-            lora_path
+            lora_path,
         )
         self.conv = get_conversation_template(model_path)
         if self.tokenizer.pad_token == None:
@@ -442,7 +443,9 @@ if __name__ == "__main__":
     parser.add_argument("--limit-model-concurrency", type=int, default=5)
     parser.add_argument("--stream-interval", type=int, default=2)
     parser.add_argument("--no-register", action="store_true")
-    parser.add_argument("--lora-path", type=str, default=None,help="Lora weight directory")
+    parser.add_argument(
+        "--lora-path", type=str, default=None, help="Lora weight directory"
+    )
 
     args = parser.parse_args()
     logger.info(f"args: {args}")

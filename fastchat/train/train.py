@@ -27,6 +27,7 @@ from transformers import Trainer
 from transformers.trainer_pt_utils import LabelSmoother
 
 import sys
+
 sys.path.append("/TTS_personal_jiahui.ni/Im-sys/FastChat/")
 
 from fastchat.conversation import SeparatorStyle
@@ -38,7 +39,9 @@ IGNORE_TOKEN_ID = LabelSmoother.ignore_index
 @dataclass
 class ModelArguments:
     model_name_or_path: Optional[str] = field(default="facebook/opt-125m")
-    lora_path: Optional[str] = field(default="Chinese-Vicuna/Chinese-Vicuna-lora-7b-belle-and-guanaco")
+    lora_path: Optional[str] = field(
+        default="Chinese-Vicuna/Chinese-Vicuna-lora-7b-belle-and-guanaco"
+    )
 
 
 @dataclass
@@ -60,10 +63,8 @@ class TrainingArguments(transformers.TrainingArguments):
         },
     )
     ckp_dir: str = field(
-        default = True,
-        metadata = {
-            "help" : "Path to save the zero3 ckpt to recover fp32 model weights."
-        }
+        default=True,
+        metadata={"help": "Path to save the zero3 ckpt to recover fp32 model weights."},
     )
 
 
@@ -101,7 +102,9 @@ def preprocess(
         conv.messages = []
         for j, sentence in enumerate(source):
             role = roles[sentence["from"]]
-            assert role == conv.roles[j % 2], f"round {j} role {role}:{sentence['value']}"
+            assert (
+                role == conv.roles[j % 2]
+            ), f"round {j} role {role}:{sentence['value']}"
             conv.append_message(role, sentence["value"])
         conversations.append(conv.get_prompt())
 
@@ -275,7 +278,7 @@ def train():
     trainer.save_state()
     trainer.save_model(output_dir=training_args.output_dir)
     rank0_print("*****Saved fp16 if zero stage 3*****")
-    if(trainer.deepspeed):
+    if trainer.deepspeed:
         trainer.deepspeed.save_checkpoint(training_args.ckp_dir)
         rank0_print("*****Saved ckpt if deepseed*****")
 

@@ -27,8 +27,8 @@ from fastchat.constants import (
 from fastchat.utils import build_logger
 
 import sys
-sys.path.append("/TTS_personal_jiahui.ni/Im-sys/FastChat/")
 
+sys.path.append("/TTS_personal_jiahui.ni/Im-sys/FastChat/")
 
 
 logger = build_logger("controller", "controller.log")

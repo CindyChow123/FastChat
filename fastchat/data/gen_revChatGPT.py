@@ -1,9 +1,10 @@
-import asyncio, dataclasses,requests, openai, json, time,argparse,os,httpx
+import asyncio, dataclasses, requests, openai, json, time, argparse, os, httpx
 from typing import List, Tuple, Any, Dict, Set, Optional
 
 from revChatGPT.V1 import Chatbot, AsyncChatbot
-'''
-python gen_revChatGPT.py >> host_0614_1136.log 2>&1'''
+
+"""
+python gen_revChatGPT.py >> host_0614_1136.log 2>&1"""
 
 
 recp_main_prompt = "Please act as an enthusiastic receptionist full of emotion and energy. I will ask you to generate conversations between you (bot) and the guest (guest) in different locations. You can add whatever details."
@@ -13,224 +14,245 @@ openai.api_key = ""
 
 
 @dataclasses.dataclass
-class Prompt():
-  '''A class for generating promp pattern'''
-  main_prompt: str
-  guest_type: List[str]
-  total_words_limit: List[int]
-  per_response_limit: List[int]
-  specialty: str
-  req_options:List[str]
-  gt_init: int=0
-  total_init: int=0
-  per_init: int=0
-  opt_init: int=0
+class Prompt:
+    """A class for generating promp pattern"""
 
-  type_pre: str="\nGuest type: "
-  total_pre: str="\nTotal words limit: "
-  per_pre: str="\nMinimum words per response: "
-  special_pre: str="\nSpecial requirements: "
-  # who_to_ask: str="\nWho to ask: Guest"
-  # who_to_answer: str="\nWho to answer: Robo"
-  req_pre: str="\nCurrent request: in the "
-  
-  def get_prompts(self):
+    main_prompt: str
+    guest_type: List[str]
+    total_words_limit: List[int]
+    per_response_limit: List[int]
+    specialty: str
+    req_options: List[str]
+    gt_init: int = 0
+    total_init: int = 0
+    per_init: int = 0
+    opt_init: int = 0
 
-    strr = self.main_prompt
-    i=self.gt_init
-    while(i<len(self.guest_type)):
-      j=self.total_init
-      while(j<len(self.total_words_limit)):
-        k=self.per_init
-        while(k<len(self.per_response_limit)):
-          m=self.opt_init
-          while(m<len(self.req_options)):
-            guest = self.type_pre + self.guest_type[i]
-            total = self.total_pre+str(self.total_words_limit[j])
-            per = self.per_pre+str(self.per_response_limit[k])
-            special = self.special_pre+self.specialty
-            req = self.req_pre+self.req_options[m]
-            yield strr+guest+total+per+special+req, f'gt-{i}-total-{j}-per-{k}-opt-{m}'
-            m += 1
-          k+=1
-        j+=1
-      i+=1
-          
+    type_pre: str = "\nGuest type: "
+    total_pre: str = "\nTotal words limit: "
+    per_pre: str = "\nMinimum words per response: "
+    special_pre: str = "\nSpecial requirements: "
+    # who_to_ask: str="\nWho to ask: Guest"
+    # who_to_answer: str="\nWho to answer: Robo"
+    req_pre: str = "\nCurrent request: in the "
+
+    def get_prompts(self):
+        strr = self.main_prompt
+        i = self.gt_init
+        while i < len(self.guest_type):
+            j = self.total_init
+            while j < len(self.total_words_limit):
+                k = self.per_init
+                while k < len(self.per_response_limit):
+                    m = self.opt_init
+                    while m < len(self.req_options):
+                        guest = self.type_pre + self.guest_type[i]
+                        total = self.total_pre + str(self.total_words_limit[j])
+                        per = self.per_pre + str(self.per_response_limit[k])
+                        special = self.special_pre + self.specialty
+                        req = self.req_pre + self.req_options[m]
+                        yield strr + guest + total + per + special + req, f"gt-{i}-total-{j}-per-{k}-opt-{m}"
+                        m += 1
+                    k += 1
+                j += 1
+            i += 1
+
 
 @dataclasses.dataclass
-class ChatLoop():
-  '''A class for chatgpt chatting'''
-  output_path: str
-  log_path: str
-  error_path: str
-  conversation_id: List[str]
-  access_token: List[str] # ?? using List + field?
-  begin_cnt: int=1
-  openai_model: str="gpt-3.5-turbo-16k"
-  chatbots: List=None
-  chatbot_num: int=0
-  checker:int=0
+class ChatLoop:
+    """A class for chatgpt chatting"""
 
-  async def async_write_response(self,prompt,extra,cnt):
-    with open(self.error_path,'a') as err:
-      with open(self.log_path,'a') as log:
-        with open(self.output_path,'a') as f:
-          prev_text=""
-          print(f'No {cnt}', end="\n", flush=True,file=f)
-          async for data in self.chatbots[self.chatbot_num].ask(prompt):
-            if self.conversation_id[self.chatbot_num] is None:
-                self.conversation_id[self.chatbot_num] = data["conversation_id"]
-                self.chatbots[self.chatbot_num].conversation_id = self.conversation_id[self.chatbot_num]
-                print(f'Conv id {self.conversation_id[self.chatbot_num]}',file=err,flush=True)
-            message = data["message"][len(prev_text) :]
-            
-            if message.endswith("END"):
-              print(message, end="\n", flush=True,file=f)
-            else:
-              print(message, end="", flush=True,file=f)
+    output_path: str
+    log_path: str
+    error_path: str
+    conversation_id: List[str]
+    access_token: List[str]  # ?? using List + field?
+    begin_cnt: int = 1
+    openai_model: str = "gpt-3.5-turbo-16k"
+    chatbots: List = None
+    chatbot_num: int = 0
+    checker: int = 0
 
-            prev_text = data["message"]
-          print(f'No.{cnt}: {extra}',flush=True,file=log)
-      
-  async def delete_conv(self):
-    with open(self.error_path,'a') as err:
-      await chat.chatbots[chat.chatbot_num].delete_conversation(chat.conversation_id[chat.chatbot_num])
-      self.conversation_id[self.chatbot_num] = None
-      self.chatbots[self.chatbot_num].conversation_id = None
-      print("Conversation deleted!",flush=True,file=err)    
+    async def async_write_response(self, prompt, extra, cnt):
+        with open(self.error_path, "a") as err:
+            with open(self.log_path, "a") as log:
+                with open(self.output_path, "a") as f:
+                    prev_text = ""
+                    print(f"No {cnt}", end="\n", flush=True, file=f)
+                    async for data in self.chatbots[self.chatbot_num].ask(prompt):
+                        if self.conversation_id[self.chatbot_num] is None:
+                            self.conversation_id[self.chatbot_num] = data[
+                                "conversation_id"
+                            ]
+                            self.chatbots[
+                                self.chatbot_num
+                            ].conversation_id = self.conversation_id[self.chatbot_num]
+                            print(
+                                f"Conv id {self.conversation_id[self.chatbot_num]}",
+                                file=err,
+                                flush=True,
+                            )
+                        message = data["message"][len(prev_text) :]
 
-  async def switch_bot(self):
-    self.checker = 0
-    self.chatbot_num = 1-self.chatbot_num
+                        if message.endswith("END"):
+                            print(message, end="\n", flush=True, file=f)
+                        else:
+                            print(message, end="", flush=True, file=f)
 
-  async def start_async_chat(self,prompt_object:Prompt, logs:Set[str]):
-    chatbot_gmail = AsyncChatbot(config = {
-      "access_token": self.access_token[0],
-      "conversation_id": self.conversation_id[0],
-      # "model": "gpt-4"
-    })
-    chatbot_usc = AsyncChatbot(config = {
-      "access_token": self.access_token[1],
-      "conversation_id": self.conversation_id[1],
-      # "model": "gpt-4"
-    })
-    chatbot_shitao = AsyncChatbot(config = {
-      "access_token": self.access_token[0],
-      "conversation_id": self.conversation_id[0],
-      # "model": "gpt-4"
-    })
-    self.chatbots = [chatbot_shitao,chatbot_usc]
+                        prev_text = data["message"]
+                    print(f"No.{cnt}: {extra}", flush=True, file=log)
 
-    # with open(self.log_path,'a') as log:
-    # with open(self.output_path,'a') as f:
-    with open(self.error_path,'a') as err:
-      cnt = self.begin_cnt
-      for prompt, extra in prompt_object.get_prompts():
-        if extra not in logs:
-          try:
-            print(f'{self.chatbot_num}: {cnt}',flush=True,file=err)
-            await self.async_write_response(prompt,extra,cnt)
-            cnt += 1
-            self.checker += 1
-            if self.checker%50 == 49: 
-              await self.switch_bot()
-          except Exception as exc:
-            print(f'Error while requesting {exc}!',flush=True,file=err)
-            if self.conversation_id[self.chatbot_num] is not None:
-              self.delete_conv()
-            await self.switch_bot()
-            await self.async_write_response(prompt,extra,cnt)
-            cnt += 1
-            continue
-          time.sleep(20)
-    
-  def start_openai_chat(self,prompt_object:Prompt,logs:Set[str]):
-    with open(self.output_path,'a') as f:
-      cnt = self.begin_cnt
-      for prompt, extra in prompt_object.get_prompts():
-        if extra not in logs:
-          print(f'No.{cnt}: {extra}',flush=True)
-          # print("Conversation:",file=f)
-          # create a chat completion
-          chat_completion = openai.ChatCompletion.create(model=self.openai_model, messages=[{"role": "user", "content": prompt}])
-          # # print the chat completion
-          print(chat_completion.choices[0].message.content,flush=True,file=f)
-          cnt += 1
-          time.sleep(20)
+    async def delete_conv(self):
+        with open(self.error_path, "a") as err:
+            await chat.chatbots[chat.chatbot_num].delete_conversation(
+                chat.conversation_id[chat.chatbot_num]
+            )
+            self.conversation_id[self.chatbot_num] = None
+            self.chatbots[self.chatbot_num].conversation_id = None
+            print("Conversation deleted!", flush=True, file=err)
+
+    async def switch_bot(self):
+        self.checker = 0
+        self.chatbot_num = 1 - self.chatbot_num
+
+    async def start_async_chat(self, prompt_object: Prompt, logs: Set[str]):
+        chatbot_gmail = AsyncChatbot(
+            config={
+                "access_token": self.access_token[0],
+                "conversation_id": self.conversation_id[0],
+                # "model": "gpt-4"
+            }
+        )
+        chatbot_usc = AsyncChatbot(
+            config={
+                "access_token": self.access_token[1],
+                "conversation_id": self.conversation_id[1],
+                # "model": "gpt-4"
+            }
+        )
+        chatbot_shitao = AsyncChatbot(
+            config={
+                "access_token": self.access_token[0],
+                "conversation_id": self.conversation_id[0],
+                # "model": "gpt-4"
+            }
+        )
+        self.chatbots = [chatbot_shitao, chatbot_usc]
+
+        # with open(self.log_path,'a') as log:
+        # with open(self.output_path,'a') as f:
+        with open(self.error_path, "a") as err:
+            cnt = self.begin_cnt
+            for prompt, extra in prompt_object.get_prompts():
+                if extra not in logs:
+                    try:
+                        print(f"{self.chatbot_num}: {cnt}", flush=True, file=err)
+                        await self.async_write_response(prompt, extra, cnt)
+                        cnt += 1
+                        self.checker += 1
+                        if self.checker % 50 == 49:
+                            await self.switch_bot()
+                    except Exception as exc:
+                        print(f"Error while requesting {exc}!", flush=True, file=err)
+                        if self.conversation_id[self.chatbot_num] is not None:
+                            self.delete_conv()
+                        await self.switch_bot()
+                        await self.async_write_response(prompt, extra, cnt)
+                        cnt += 1
+                        continue
+                    time.sleep(20)
+
+    def start_openai_chat(self, prompt_object: Prompt, logs: Set[str]):
+        with open(self.output_path, "a") as f:
+            cnt = self.begin_cnt
+            for prompt, extra in prompt_object.get_prompts():
+                if extra not in logs:
+                    print(f"No.{cnt}: {extra}", flush=True)
+                    # print("Conversation:",file=f)
+                    # create a chat completion
+                    chat_completion = openai.ChatCompletion.create(
+                        model=self.openai_model,
+                        messages=[{"role": "user", "content": prompt}],
+                    )
+                    # # print the chat completion
+                    print(
+                        chat_completion.choices[0].message.content, flush=True, file=f
+                    )
+                    cnt += 1
+                    time.sleep(20)
 
 
+if __name__ == "__main__":
+    tts = "/TTS_personal_jiahui.ni/"
+    local = "/data/"
 
-if __name__=="__main__":
+    openai_output = "Im-sys/FastChat/fastchat/datasets/RoboEmo/Host"
+    openai_log = "Im-sys/FastChat/fastchat/data/host_rev_add_gpt4.log"
+    rev_output = "Im-sys/FastChat/fastchat/datasets/RoboEmo/Host_rev_add_gpt4"
+    rev_log = "Im-sys/FastChat/fastchat/data/host_0619_rev.log"
+    rcpt_place_json = "Im-sys/FastChat/fastchat/datasets/RoboEmo/Rcpt_places.json"
+    private_ids_json = "Im-sys/FastChat/fastchat/datasets/RoboEmo/Private_ids.json"
 
-  tts = "/TTS_personal_jiahui.ni/"
-  local = "/data/"
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output-file", type=str, default=rev_output)
+    parser.add_argument("--log", action="store_true", default=False)
+    parser.add_argument("--log-file", type=str, default=rev_log)
+    parser.add_argument("--error-file", type=str)
+    parser.add_argument("--openai", action="store_true", default=False)
+    parser.add_argument("--revgpt", action="store_true", default=False)
+    parser.add_argument("--base-dir", type=str, default=local)
+    # parser.add_argument("--rev-conv-id",type=str,default=conversation_id)
+    args = parser.parse_args()
 
-  openai_output = "Im-sys/FastChat/fastchat/datasets/RoboEmo/Host"
-  openai_log = "Im-sys/FastChat/fastchat/data/host_rev_add_gpt4.log"
-  rev_output = "Im-sys/FastChat/fastchat/datasets/RoboEmo/Host_rev_add_gpt4"
-  rev_log = "Im-sys/FastChat/fastchat/data/host_0619_rev.log"
-  rcpt_place_json = "Im-sys/FastChat/fastchat/datasets/RoboEmo/Rcpt_places.json"
-  private_ids_json = "Im-sys/FastChat/fastchat/datasets/RoboEmo/Private_ids.json"
+    with open(args.base_dir + rcpt_place_json, "r") as f:
+        params = json.load(f)
 
-  parser = argparse.ArgumentParser()
-  parser.add_argument("--output-file",type=str,default=rev_output)
-  parser.add_argument("--log",action="store_true",default=False)
-  parser.add_argument("--log-file",type=str,default=rev_log)
-  parser.add_argument("--error-file",type=str)
-  parser.add_argument("--openai",action="store_true",default=False)
-  parser.add_argument("--revgpt",action="store_true",default=False)
-  parser.add_argument("--base-dir",type=str,default=local)
-  # parser.add_argument("--rev-conv-id",type=str,default=conversation_id)
-  args = parser.parse_args()
+    with open(args.base_dir + private_ids_json, "r") as f:
+        ids = json.load(f)
 
-  with open(args.base_dir+rcpt_place_json,'r') as f:
-    params = json.load(f)
+    if args.log:
+        if not os.path.exists(args.log_file):
+            prev_req = set()
+            file = open(args.log_file, "w")
+            file.close()
+        else:
+            with open(args.log_file, "r") as last_log:
+                lines = last_log.readlines()
+                prev_req = set()
+                for line in lines:
+                    if not line.startswith("No"):
+                        continue
+                    prev_req.add(line[line.find(":") + 2 :].strip())
 
-  with open(args.base_dir+private_ids_json,'r') as f:
-    ids = json.load(f)
+    # print(len(prev_req)+1)
 
-  if args.log:
-    if not os.path.exists(args.log_file):
-      prev_req = set()
-      file = open(args.log_file, 'w')
-      file.close()
-    else:
-      with open(args.log_file,'r') as last_log:
-        lines = last_log.readlines()
-        prev_req = set()
-        for line in lines:
-          if not line.startswith("No"): continue
-          prev_req.add(line[line.find(':')+2:].strip())    
-    
-  
-  # print(len(prev_req)+1)
+    chat = ChatLoop(
+        output_path=args.output_file,
+        log_path=args.log_file,
+        error_path=args.error_file,
+        conversation_id=[None, None],
+        access_token=ids["access_tokens"],
+        begin_cnt=len(prev_req) + 1,
+    )
 
-  chat = ChatLoop(output_path=args.output_file,
-                  log_path = args.log_file,
-                  error_path=args.error_file,
-                  conversation_id=[None,None],
-                  access_token=ids['access_tokens'],
-                  begin_cnt=len(prev_req)+1)
+    gt = params["guest_type"]
+    req_opt = params["tour_places"]
+    prompts = Prompt(
+        main_prompt=host_main_prompt,
+        guest_type=gt,
+        total_words_limit=[100, 200, 300, 400, 500],
+        per_response_limit=[5, 15, 25, 35, 45],
+        specialty='Try best to use different greetings, adjectives and adverbs and goodbyes in each conversation. \
+      Begin the conversation by the "guest" greeting the "bot", end the conversation by the "guest" bidding farewell at the "bot" with the "bot" answering back.\
+      Begin each conversation by typing "BEGIN\n" in a separate line, end each conversation by typing "END\n" in a separate line. Only outputs the dialogue sentences.',
+        req_options=req_opt,
+    )
 
-  gt = params['guest_type']
-  req_opt = params['tour_places']
-  prompts = Prompt(
-    main_prompt= host_main_prompt,
-    guest_type=gt,
-    total_words_limit=[100,200,300,400,500],
-    per_response_limit=[5,15,25,35,45],
-    specialty="Try best to use different greetings, adjectives and adverbs and goodbyes in each conversation. \
-      Begin the conversation by the \"guest\" greeting the \"bot\", end the conversation by the \"guest\" bidding farewell at the \"bot\" with the \"bot\" answering back.\
-      Begin each conversation by typing \"BEGIN\n\" in a separate line, end each conversation by typing \"END\n\" in a separate line. Only outputs the dialogue sentences.",
-    req_options=req_opt,
-  )
-
-  try:
-    if args.revgpt:      
-      asyncio.run(chat.start_async_chat(prompt_object=prompts,logs=prev_req))
-    elif args.openai:
-      chat.start_openai_chat(prompt_object=prompts,logs=prev_req)
-  except KeyboardInterrupt as e:
-    if chat.conversation_id[chat.chatbot_num] is not None:
-      asyncio.run(chat.delete_conv())
-  
+    try:
+        if args.revgpt:
+            asyncio.run(chat.start_async_chat(prompt_object=prompts, logs=prev_req))
+        elif args.openai:
+            chat.start_openai_chat(prompt_object=prompts, logs=prev_req)
+    except KeyboardInterrupt as e:
+        if chat.conversation_id[chat.chatbot_num] is not None:
+            asyncio.run(chat.delete_conv())

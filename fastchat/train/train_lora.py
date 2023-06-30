@@ -29,13 +29,15 @@ import transformers
 from transformers import Trainer, BitsAndBytesConfig, deepspeed
 import torch
 
-import sys,os
-sys.path.append("/TTS_personal_jiahui.ni/Im-sys/FastChat/")
-os.environ["WANDB_API_KEY"]="c80fd16d325b241c62ff538d4acce35f80cc5b93"
+import sys, os
 
-import sys,os
 sys.path.append("/TTS_personal_jiahui.ni/Im-sys/FastChat/")
-os.environ["WANDB_API_KEY"]="c80fd16d325b241c62ff538d4acce35f80cc5b93"
+os.environ["WANDB_API_KEY"] = "c80fd16d325b241c62ff538d4acce35f80cc5b93"
+
+import sys, os
+
+sys.path.append("/TTS_personal_jiahui.ni/Im-sys/FastChat/")
+os.environ["WANDB_API_KEY"] = "c80fd16d325b241c62ff538d4acce35f80cc5b93"
 
 from fastchat.train.train import (
     DataArguments,
@@ -52,13 +54,16 @@ from fastchat.train.train import (
 
 
 global_rank = None
+
+
 def rank0_print(*args):
     """print the conversation if the global rank is 0, for multi host application"""
     global global_rank
-    if(global_rank is None):
+    if global_rank is None:
         global_rank = get_global_rank()
-    if(global_rank == 0):
+    if global_rank == 0:
         print(*args)
+
 
 @dataclass
 class LoraArguments:
@@ -72,8 +77,10 @@ class LoraArguments:
     lora_bias: str = "none"
     q_lora: bool = False
 
+
 def get_global_rank() -> int:
     return dist.get_world_rank_from_launcher()
+
 
 def maybe_zero_3(param):
     if hasattr(param, "ds_id"):

@@ -24,6 +24,7 @@ from rich.live import Live
 from rich.markdown import Markdown
 
 import sys
+
 sys.path.append("/TTS_personal_jiahui.ni/Im-sys/FastChat/")
 
 from fastchat.model.model_adapter import add_model_args, get_global_rank
@@ -31,34 +32,38 @@ from fastchat.modules.gptq import GptqConfig
 from fastchat.serve.inference import ChatIO, chat_loop
 
 global_rank = None
-def rank0_print(*arg,end:str="\n",flush:bool=False):
+
+
+def rank0_print(*arg, end: str = "\n", flush: bool = False):
     """print the conversation if the global rank is 0, for multi host application"""
     global global_rank
-    if(global_rank is None):
+    if global_rank is None:
         global_rank = get_global_rank()
-    if(global_rank == 0):
-        with open(args.conv_out_path,"a") as f:
-            print(*arg, end = end, flush = flush, file=f)
+    if global_rank == 0:
+        with open(args.conv_out_path, "a") as f:
+            print(*arg, end=end, flush=flush, file=f)
+
 
 class FileChatIO(ChatIO):
     inputs = None
     input_index = -1
+
     def __init__(self, file_path: str) -> None:
         super().__init__()
-        with open(file_path,"r") as f:
+        with open(file_path, "r") as f:
             self.inputs = f.readlines()
 
     def prompt_for_input(self, role: str) -> str:
-        if(self.input_index < len(self.inputs)-1):
+        if self.input_index < len(self.inputs) - 1:
             self.input_index += 1
-            rank0_print(f"{role}: ", self.inputs[self.input_index].strip('\n'))
+            rank0_print(f"{role}: ", self.inputs[self.input_index].strip("\n"))
             return self.inputs[self.input_index]
         else:
             return None
-        
+
     def prompt_for_output(self, role: str):
         rank0_print(f"{role}: ", end="", flush=True)
-        
+
     def stream_output(self, output_stream):
         pre = 0
         for outputs in output_stream:
@@ -70,6 +75,7 @@ class FileChatIO(ChatIO):
                 pre = now
         rank0_print(" ".join(output_text[pre:]), flush=True)
         return " ".join(output_text)
+
 
 class SimpleChatIO(ChatIO):
     def prompt_for_input(self, role) -> str:
@@ -239,7 +245,7 @@ def main(args):
             args.revision,
             args.debug,
             args.use_deepspeed,
-            args.lora_path
+            args.lora_path,
         )
     except KeyboardInterrupt:
         print("exit...")
@@ -276,9 +282,25 @@ if __name__ == "__main__":
         action="store_true",
         help="Print useful debug information (e.g., prompts)",
     )
-    parser.add_argument("--conv-file", type=str, default=None, help="User prompt file for conversation under file chat mode")
-    parser.add_argument("--use-deepspeed", action="store_true", help="Whether using deepspeed to accelerate")
-    parser.add_argument("--conv-out-path", type=str, default=None, help="The output file path for generated conversation")
-    parser.add_argument("--lora-path", type=str, default=None,help="Lora weight directory")
+    parser.add_argument(
+        "--conv-file",
+        type=str,
+        default=None,
+        help="User prompt file for conversation under file chat mode",
+    )
+    parser.add_argument(
+        "--use-deepspeed",
+        action="store_true",
+        help="Whether using deepspeed to accelerate",
+    )
+    parser.add_argument(
+        "--conv-out-path",
+        type=str,
+        default=None,
+        help="The output file path for generated conversation",
+    )
+    parser.add_argument(
+        "--lora-path", type=str, default=None, help="Lora weight directory"
+    )
     args = parser.parse_args()
     main(args)

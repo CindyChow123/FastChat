@@ -38,6 +38,7 @@ from deepspeed import comm as dist
 
 from peft import PeftModel
 
+
 class BaseModelAdapter:
     """The base and the default model adapter."""
 
@@ -207,9 +208,11 @@ def load_model(
 
     # Load model
     adapter = get_model_adapter(model_path)
-    model, tokenizer = adapter.load_model(model_path,lora_path,kwargs)
+    model, tokenizer = adapter.load_model(model_path, lora_path, kwargs)
 
-    if (not use_deepspeed and device == "cuda" and num_gpus == 1 and not cpu_offloading) or device == "mps":
+    if (
+        not use_deepspeed and device == "cuda" and num_gpus == 1 and not cpu_offloading
+    ) or device == "mps":
         model.to(device)
 
     elif device == "xpu":
@@ -217,12 +220,12 @@ def load_model(
         model = model.to("xpu")
         model = torch.xpu.optimize(model, dtype=torch.bfloat16, inplace=True)
 
-    if (use_deepspeed):
+    if use_deepspeed:
         model = deepspeed.init_inference(
-            model = model,
-            mp_size = num_gpus,
-            dtype = torch.float,
-            injection_policy={LlamaDecoderLayer: ('self_attn.o_proj', 'mlp.down_proj')}
+            model=model,
+            mp_size=num_gpus,
+            dtype=torch.float,
+            injection_policy={LlamaDecoderLayer: ("self_attn.o_proj", "mlp.down_proj")},
         )
     if debug:
         print(model)
@@ -232,6 +235,7 @@ def load_model(
 
 def get_global_rank() -> int:
     return dist.get_world_rank_from_launcher()
+
 
 def get_conversation_template(model_path: str) -> Conversation:
     adapter = get_model_adapter(model_path)
@@ -355,7 +359,7 @@ class VicunaAdapter(BaseModelAdapter):
     def match(self, model_path: str):
         return "vicuna" in model_path
 
-    def load_model(self, model_path: str,lora_path: str, from_pretrained_kwargs: dict):
+    def load_model(self, model_path: str, lora_path: str, from_pretrained_kwargs: dict):
         revision = from_pretrained_kwargs.get("revision", "main")
         tokenizer = AutoTokenizer.from_pretrained(
             model_path, use_fast=False, revision=revision
@@ -368,11 +372,11 @@ class VicunaAdapter(BaseModelAdapter):
         self.raise_warning_for_old_weights(model)
         if lora_path:
             model = PeftModel.from_pretrained(
-            model,
-            lora_path, # specific checkpoint path from "Chinese-Vicuna/Chinese-Vicuna-lora-7b-belle-and-guanaco"
-            torch_dtype=torch.float16,
-            device_map={'': 0}
-        )
+                model,
+                lora_path,  # specific checkpoint path from "Chinese-Vicuna/Chinese-Vicuna-lora-7b-belle-and-guanaco"
+                torch_dtype=torch.float16,
+                device_map={"": 0},
+            )
         return model, tokenizer
 
     def get_default_conv_template(self, model_path: str) -> Conversation:

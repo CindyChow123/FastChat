@@ -256,7 +256,7 @@ def chat_loop(
     gptq_config: GptqConfig,
     revision: str,
     debug: bool,
-    use_deepspeed: bool=False,
+    use_deepspeed: bool = False,
     lora_path: Optional[str] = None,
 ):
     # Model
@@ -269,8 +269,8 @@ def chat_loop(
         cpu_offloading,
         gptq_config,
         revision,
-        debug, 
-        use_deepspeed, 
+        debug,
+        use_deepspeed,
         lora_path,
     )
     is_chatglm = "chatglm" in str(type(model)).lower()
