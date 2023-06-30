@@ -186,18 +186,18 @@ def load_model(
             load_in_8bit_fp32_cpu_offload=cpu_offloading
         )
         kwargs["load_in_8bit"] = load_8bit
-    elif load_8bit:
-        if num_gpus != 1:
-            warnings.warn(
-                "8-bit quantization is not supported for multi-gpu inference."
-            )
-        else:
-            return adapter.load_compress_model(
-                model_path=model_path,
-                device=device,
-                torch_dtype=kwargs["torch_dtype"],
-                revision=revision,
-            )
+    # elif load_8bit:
+    #     if num_gpus != 1:
+    #         warnings.warn(
+    #             "8-bit quantization is not supported for multi-gpu inference."
+    #         )
+    #     else:
+    #         return adapter.load_compress_model(
+    #             model_path=model_path,
+    #             device=device,
+    #             torch_dtype=kwargs["torch_dtype"],
+    #             revision=revision,
+    #         )
     elif gptq_config and gptq_config.wbits < 16:
         return load_gptq_quantized(
             model_path,
@@ -205,6 +205,7 @@ def load_model(
             device=device,
         )
     kwargs["revision"] = revision
+    kwargs["load_in_8bit"] = load_8bit
 
     # Load model
     adapter = get_model_adapter(model_path)
@@ -317,7 +318,6 @@ def remove_parent_directory_name(model_path):
 
 class PeftModelAdapter:
     """Loads any "peft" model and it's base model."""
-    base_adapter = None
     def match(self, model_path: str):
         """Accepts any model path with "peft" in the name"""
         return "peft" in model_path
@@ -333,8 +333,8 @@ class PeftModelAdapter:
                 f"PeftModelAdapter cannot load a base model with 'peft' in the name: {config.base_model_name_or_path}"
             )
 
-        self.base_adapter = get_model_adapter(base_model_path)
-        base_model, tokenizer = self.base_adapter.load_model(
+        base_adapter = get_model_adapter(base_model_path)
+        base_model, tokenizer = base_adapter.load_model(
             base_model_path, lora_path,from_pretrained_kwargs
         )
         model = PeftModel.from_pretrained(base_model, model_path)
@@ -350,7 +350,9 @@ class PeftModelAdapter:
             raise ValueError(
                 f"PeftModelAdapter cannot load a base model with 'peft' in the name: {config.base_model_name_or_path}"
             )
-        return self.base_adapter.get_default_conv_template(config.base_model_name_or_path)
+        base_model_path = config.base_model_name_or_path
+        base_adapter = get_model_adapter(base_model_path)
+        return base_adapter.get_default_conv_template(config.base_model_name_or_path)
 
 
 class VicunaAdapter(BaseModelAdapter):
@@ -367,6 +369,7 @@ class VicunaAdapter(BaseModelAdapter):
         model = AutoModelForCausalLM.from_pretrained(
             model_path,
             low_cpu_mem_usage=True,
+            device_map="auto",
             **from_pretrained_kwargs,
         )
         self.raise_warning_for_old_weights(model)
