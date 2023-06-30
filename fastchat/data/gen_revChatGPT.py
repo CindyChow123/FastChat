@@ -5,6 +5,7 @@ from revChatGPT.V1 import Chatbot, AsyncChatbot
 '''
 python gen_revChatGPT.py >> host_0614_1136.log 2>&1'''
 
+
 recp_main_prompt = "Please act as an enthusiastic receptionist full of emotion and energy. I will ask you to generate conversations between you (bot) and the guest (guest) in different locations. You can add whatever details."
 host_main_prompt = "Please act as an enthusiastic tour guide full of emotion and energy. I will ask you to generate conversations between you (bot) and the tourists (guest) in different locations. Please introduce the place in detail."
 
