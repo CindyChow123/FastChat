@@ -34,11 +34,6 @@ import sys, os
 sys.path.append("/TTS_personal_jiahui.ni/Im-sys/FastChat/")
 os.environ["WANDB_API_KEY"] = "c80fd16d325b241c62ff538d4acce35f80cc5b93"
 
-import sys, os
-
-sys.path.append("/TTS_personal_jiahui.ni/Im-sys/FastChat/")
-os.environ["WANDB_API_KEY"] = "c80fd16d325b241c62ff538d4acce35f80cc5b93"
-
 from fastchat.train.train import (
     DataArguments,
     ModelArguments,
@@ -165,8 +160,8 @@ def train():
         bias=lora_args.lora_bias,
         task_type="CAUSAL_LM",
     )
-    model.gradient_checkpointing_enable()
-    model.enable_input_require_grads()
+    # model.gradient_checkpointing_enable()
+    # model.enable_input_require_grads()
 
     if lora_args.q_lora:
         model = prepare_model_for_kbit_training(

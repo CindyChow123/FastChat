@@ -317,12 +317,12 @@ def remove_parent_directory_name(model_path):
 
 class PeftModelAdapter:
     """Loads any "peft" model and it's base model."""
-
+    base_adapter = None
     def match(self, model_path: str):
         """Accepts any model path with "peft" in the name"""
         return "peft" in model_path
 
-    def load_model(self, model_path: str, from_pretrained_kwargs: dict):
+    def load_model(self, model_path: str,lora_path:str, from_pretrained_kwargs: dict):
         """Loads the base model then the (peft) adapter weights"""
         from peft import PeftConfig, PeftModel
 
@@ -333,9 +333,9 @@ class PeftModelAdapter:
                 f"PeftModelAdapter cannot load a base model with 'peft' in the name: {config.base_model_name_or_path}"
             )
 
-        base_adapter = get_model_adapter(base_model_path)
-        base_model, tokenizer = base_adapter.load_model(
-            base_model_path, from_pretrained_kwargs
+        self.base_adapter = get_model_adapter(base_model_path)
+        base_model, tokenizer = self.base_adapter.load_model(
+            base_model_path, lora_path,from_pretrained_kwargs
         )
         model = PeftModel.from_pretrained(base_model, model_path)
 
@@ -350,7 +350,7 @@ class PeftModelAdapter:
             raise ValueError(
                 f"PeftModelAdapter cannot load a base model with 'peft' in the name: {config.base_model_name_or_path}"
             )
-        return get_conv_template(config.base_model_name_or_path)
+        return self.base_adapter.get_default_conv_template(config.base_model_name_or_path)
 
 
 class VicunaAdapter(BaseModelAdapter):
