@@ -1,13 +1,17 @@
+"""
+Clean chatbot arena battle log.
+"""
 import argparse
 import datetime
 import json
-from pytz import timezone
 import os
+from pytz import timezone
 import time
 
 from tqdm import tqdm
 
 from fastchat.serve.monitor.basic_stats import get_log_files
+from fastchat.utils import detect_language
 
 
 VOTES = ["tievote", "leftvote", "rightvote", "bothbad_vote"]
@@ -33,11 +37,12 @@ IDENTITY_WORDS = [
 
 def get_log_files(max_num_files=None):
     dates = []
-    for month in [4]:
-        for day in range(24, 32):
+    for month in [4, 5]:
+        for day in range(1, 32):
             dates.append(f"2023-{month:02d}-{day:02d}")
-    for month in [5]:
-        for day in range(1, 9):
+
+    for month in [6]:
+        for day in range(1, 20):
             dates.append(f"2023-{month:02d}-{day:02d}")
 
     num_servers = 12
@@ -50,21 +55,6 @@ def get_log_files(max_num_files=None):
     max_num_files = max_num_files or len(filenames)
     filenames = filenames[-max_num_files:]
     return filenames
-
-
-def detect_lang(text):
-    import polyglot
-    from polyglot.detect import Detector
-    from polyglot.detect.base import logger as polyglot_logger
-    import pycld2
-
-    polyglot_logger.setLevel("ERROR")
-
-    try:
-        lang_code = Detector(text).language.name
-    except (pycld2.error, polyglot.detect.base.UnknownLanguage):
-        lang_code = "unknown"
-    return lang_code
 
 
 def remove_html(raw):
@@ -135,7 +125,7 @@ def clean_battle_data(log_files):
         if state["offset"] >= len(state["messages"]):
             ct_invalid += 1
             continue
-        lang_code = detect_lang(state["messages"][state["offset"]][1])
+        lang_code = detect_language(state["messages"][state["offset"]][1])
         rounds = (len(state["messages"]) - state["offset"]) // 2
 
         # Drop conversations if the model names are leaked
@@ -155,12 +145,15 @@ def clean_battle_data(log_files):
             ct_leaked_identity += 1
             continue
 
-        # Keep the result
+        # Replace bard with palm
+        models = [m.replace("bard", "palm-2") for m in models]
+
+        # Save the result
         battles.append(
             dict(
                 model_a=models[0],
                 model_b=models[1],
-                win=convert_type[row["type"]],
+                winner=convert_type[row["type"]],
                 anony=anony,
                 rounds=rounds,
                 language=lang_code,
@@ -194,13 +187,16 @@ if __name__ == "__main__":
 
     log_files = get_log_files(args.max_num_files)
     battles = clean_battle_data(log_files)
+    last_updated_tstamp = battles[-1]["tstamp"]
+    cutoff_date = datetime.datetime.fromtimestamp(
+        last_updated_tstamp, tz=timezone("US/Pacific")
+    ).strftime("%Y%m%d")
 
     print("Samples:")
     for i in range(4):
         print(battles[i])
 
-    date = datetime.datetime.now(tz=timezone("US/Pacific")).strftime("%Y%m%d")
-    output = f"clean_battle_{date}.json"
+    output = f"clean_battle_{cutoff_date}.json"
     with open(output, "w") as fout:
         json.dump(battles, fout, indent=2)
     print(f"Write cleaned data to {output}")

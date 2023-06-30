@@ -16,6 +16,8 @@ from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.responses import StreamingResponse, JSONResponse
 import requests
 
+from fastchat.modules.gptq import GptqConfig
+
 try:
     from transformers import (
         AutoTokenizer,
@@ -31,13 +33,19 @@ except ImportError:
         AutoModel,
     )
 import torch
+import torch.nn.functional as F
 import uvicorn
 
-from fastchat.constants import WORKER_HEART_BEAT_INTERVAL, ErrorCode
-from fastchat.model.model_adapter import load_model, add_model_args
+from fastchat.constants import WORKER_HEART_BEAT_INTERVAL, ErrorCode, SERVER_ERROR_MSG
+from fastchat.model.model_adapter import (
+    load_model,
+    add_model_args,
+    get_conversation_template,
+)
 from fastchat.model.chatglm_model import chatglm_generate_stream
+from fastchat.model.falcon_model import falcon_generate_stream
 from fastchat.serve.inference import generate_stream
-from fastchat.utils import build_logger, server_error_msg, pretty_print_semaphore
+from fastchat.utils import build_logger, pretty_print_semaphore
 
 GB = 1 << 30
 
@@ -62,38 +70,56 @@ class ModelWorker:
         worker_id,
         no_register,
         model_path,
-        model_name,
+        model_names,
         device,
         num_gpus,
         max_gpu_memory,
         load_8bit=False,
         cpu_offloading=False,
-        lora_path = None
+        lora_path = None,
+        gptq_config=None,
     ):
         self.controller_addr = controller_addr
         self.worker_addr = worker_addr
         self.worker_id = worker_id
         if model_path.endswith("/"):
             model_path = model_path[:-1]
-        self.model_name = model_name or model_path.split("/")[-1]
+        self.model_names = model_names or [model_path.split("/")[-1]]
         self.device = device
 
-        logger.info(f"Loading the model {self.model_name} on worker {worker_id} ...")
+        logger.info(f"Loading the model {self.model_names} on worker {worker_id} ...")
         self.model, self.tokenizer = load_model(
-            model_path, device, num_gpus, max_gpu_memory, load_8bit, cpu_offloading,lora_path
+            model_path,
+            device,
+            num_gpus,
+            max_gpu_memory,
+            load_8bit,
+            cpu_offloading,lora_path,
+            gptq_config,
+            lora_path
         )
+        self.conv = get_conversation_template(model_path)
+        if self.tokenizer.pad_token == None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
 
         if hasattr(self.model.config, "max_sequence_length"):
             self.context_len = self.model.config.max_sequence_length
+        elif hasattr(self.model.config, "seq_length"):
+            self.context_len = self.model.config.seq_length
         elif hasattr(self.model.config, "max_position_embeddings"):
             self.context_len = self.model.config.max_position_embeddings
+        elif hasattr(self.model.config, "seq_length"):
+            self.context_len = self.model.config.seq_length
         else:
             self.context_len = 2048
 
         # generate_stream
         is_chatglm = "chatglm" in str(type(self.model)).lower()
+        is_falcon = "rwforcausallm" in str(type(self.model)).lower()
         if is_chatglm:
             self.generate_stream_func = chatglm_generate_stream
+        elif is_falcon:
+            self.generate_stream_func = falcon_generate_stream
         else:
             self.generate_stream_func = generate_stream
 
@@ -118,9 +144,10 @@ class ModelWorker:
 
     def send_heart_beat(self):
         logger.info(
-            f"Send heart beat. Models: {[self.model_name]}. "
+            f"Send heart beat. Models: {self.model_names}. "
             f"Semaphore: {pretty_print_semaphore(model_semaphore)}. "
-            f"global_counter: {global_counter}"
+            f"global_counter: {global_counter}. "
+            f"worker_id: {worker_id}. "
         )
 
         url = self.controller_addr + "/receive_heart_beat"
@@ -160,7 +187,7 @@ class ModelWorker:
 
     def get_status(self):
         return {
-            "model_names": [self.model_name],
+            "model_names": self.model_names,
             "speed": 1,
             "queue_length": self.get_queue_length(),
         }
@@ -175,6 +202,9 @@ class ModelWorker:
             "error_code": 0,
         }
         return ret
+
+    def get_conv_template(self):
+        return {"conv": self.conv}
 
     def generate_stream_gate(self, params):
         try:
@@ -199,13 +229,13 @@ class ModelWorker:
                 yield json.dumps(ret).encode() + b"\0"
         except torch.cuda.OutOfMemoryError as e:
             ret = {
-                "text": f"{server_error_msg}\n\n({e})",
+                "text": f"{SERVER_ERROR_MSG}\n\n({e})",
                 "error_code": ErrorCode.CUDA_OUT_OF_MEMORY,
             }
             yield json.dumps(ret).encode() + b"\0"
         except (ValueError, RuntimeError) as e:
             ret = {
-                "text": f"{server_error_msg}\n\n({e})",
+                "text": f"{SERVER_ERROR_MSG}\n\n({e})",
                 "error_code": ErrorCode.INTERNAL_ERROR,
             }
             yield json.dumps(ret).encode() + b"\0"
@@ -222,20 +252,20 @@ class ModelWorker:
                 args.stream_interval,
             ):
                 ret["text"] = output["text"]
-            if "usage" in output:
-                ret["usage"] = output["usage"]
-            if "finish_reason" in output:
-                ret["finish_reason"] = output["finish_reason"]
-            if "logprobs" in output:
-                ret["logprobs"] = output["logprobs"]
+                if "usage" in output:
+                    ret["usage"] = output["usage"]
+                if "finish_reason" in output:
+                    ret["finish_reason"] = output["finish_reason"]
+                if "logprobs" in output:
+                    ret["logprobs"] = output["logprobs"]
         except torch.cuda.OutOfMemoryError as e:
             ret = {
-                "text": f"{server_error_msg}\n\n({e})",
+                "text": f"{SERVER_ERROR_MSG}\n\n({e})",
                 "error_code": ErrorCode.CUDA_OUT_OF_MEMORY,
             }
         except (ValueError, RuntimeError) as e:
             ret = {
-                "text": f"{server_error_msg}\n\n({e})",
+                "text": f"{SERVER_ERROR_MSG}\n\n({e})",
                 "error_code": ErrorCode.INTERNAL_ERROR,
             }
         return ret
@@ -244,28 +274,65 @@ class ModelWorker:
     def get_embeddings(self, params):
         try:
             tokenizer = self.tokenizer
-            input_ids = tokenizer.encode(params["input"], return_tensors="pt").to(
-                self.device
-            )
-            model_output = self.model(input_ids, output_hidden_states=True)
-            is_chatglm = "chatglm" in str(type(self.model)).lower()
-            if is_chatglm:
-                data = (model_output.hidden_states[-1].transpose(0, 1))[0]
+            is_llama = "llama" in str(
+                type(self.model)
+            )  # vicuna support batch inference
+            is_chatglm = "chatglm" in str(type(self.model))
+            is_t5 = "t5" in str(type(self.model))
+            if is_llama:
+                encoding = tokenizer.batch_encode_plus(
+                    params["input"], padding=True, return_tensors="pt"
+                )
+                input_ids = encoding["input_ids"].to(self.device)
+                attention_mask = encoding["attention_mask"].to(self.device)
+                model_output = self.model(
+                    input_ids, attention_mask, output_hidden_states=True
+                )
+                data = model_output.hidden_states[-1]
+                mask = attention_mask.unsqueeze(-1).expand(data.size()).float()
+                masked_embeddings = data * mask
+                sum_embeddings = torch.sum(masked_embeddings, dim=1)
+                seq_length = torch.sum(mask, dim=1)
+                embedding = sum_embeddings / seq_length
+                normalized_embeddings = F.normalize(embedding, p=2, dim=1)
+                ret = {
+                    "embedding": normalized_embeddings.tolist(),
+                    "token_num": torch.sum(attention_mask).item(),
+                }
             else:
-                data = model_output.hidden_states[-1][0]
-            embedding = torch.mean(data, dim=0)
-            ret = {
-                "embedding": embedding.tolist(),
-                "token_num": len(self.tokenizer(params["input"]).input_ids),
-            }
+                embedding = []
+                token_num = 0
+                for text in params["input"]:
+                    input_ids = tokenizer.encode(text, return_tensors="pt").to(
+                        self.device
+                    )
+                    if is_t5:
+                        model_output = self.model(
+                            input_ids, decoder_input_ids=input_ids
+                        )
+                    else:
+                        model_output = self.model(input_ids, output_hidden_states=True)
+                    if is_chatglm:
+                        data = (model_output.hidden_states[-1].transpose(0, 1))[0]
+                    elif is_t5:
+                        data = model_output.encoder_last_hidden_state[0]
+                    else:
+                        data = model_output.hidden_states[-1][0]
+                    data = F.normalize(torch.mean(data, dim=0), p=2, dim=0)
+                    embedding.append(data.tolist())
+                    token_num += len(input_ids[0])
+                ret = {
+                    "embedding": embedding,
+                    "token_num": token_num,
+                }
         except torch.cuda.OutOfMemoryError as e:
             ret = {
-                "text": f"{server_error_msg}\n\n({e})",
+                "text": f"{SERVER_ERROR_MSG}\n\n({e})",
                 "error_code": ErrorCode.CUDA_OUT_OF_MEMORY,
             }
         except (ValueError, RuntimeError) as e:
             ret = {
-                "text": f"{server_error_msg}\n\n({e})",
+                "text": f"{SERVER_ERROR_MSG}\n\n({e})",
                 "error_code": ErrorCode.INTERNAL_ERROR,
             }
         return ret
@@ -348,6 +415,11 @@ async def count_token(request: Request):
     return worker.count_token(params)
 
 
+@app.post("/worker_get_conv_template")
+async def api_get_conv(request: Request):
+    return worker.get_conv_template()
+
+
 @app.post("/model_details")
 async def model_details(request: Request):
     return {"context_length": worker.context_len}
@@ -362,7 +434,11 @@ if __name__ == "__main__":
         "--controller-address", type=str, default="http://0.0.0.0:21001"
     )
     add_model_args(parser)
-    parser.add_argument("--model-name", type=str, help="Optional display name")
+    parser.add_argument(
+        "--model-names",
+        type=lambda s: s.split(","),
+        help="Optional display comma separated names",
+    )
     parser.add_argument("--limit-model-concurrency", type=int, default=5)
     parser.add_argument("--stream-interval", type=int, default=2)
     parser.add_argument("--no-register", action="store_true")
@@ -378,18 +454,26 @@ if __name__ == "__main__":
             )
         os.environ["CUDA_VISIBLE_DEVICES"] = args.gpus
 
+    gptq_config = GptqConfig(
+        ckpt=args.gptq_ckpt or args.model_path,
+        wbits=args.gptq_wbits,
+        groupsize=args.gptq_groupsize,
+        act_order=args.gptq_act_order,
+    )
+
     worker = ModelWorker(
         args.controller_address,
         args.worker_address,
         worker_id,
         args.no_register,
         args.model_path,
-        args.model_name,
+        args.model_names,
         args.device,
         args.num_gpus,
         args.max_gpu_memory,
         args.load_8bit,
         args.cpu_offloading,
         args.lora_path,
+        gptq_config,
     )
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")

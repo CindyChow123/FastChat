@@ -1,3 +1,6 @@
+"""
+Common utilities.
+"""
 from asyncio import AbstractEventLoop
 import json
 import logging
@@ -13,14 +16,9 @@ import torch
 
 from fastchat.constants import LOGDIR
 
-server_error_msg = (
-    "**NETWORK ERROR DUE TO HIGH TRAFFIC. PLEASE REGENERATE OR REFRESH THIS PAGE.**"
-)
-moderation_msg = (
-    "YOUR INPUT VIOLATES OUR CONTENT MODERATION GUIDELINES. PLEASE TRY AGAIN."
-)
 
 handler = None
+visited_loggers = set()
 
 
 def build_logger(logger_name, logger_filename):
@@ -60,18 +58,18 @@ def build_logger(logger_name, logger_filename):
     logger = logging.getLogger(logger_name)
     logger.setLevel(logging.INFO)
 
-    # Add a file handler for all loggers
-    if handler is None:
-        os.makedirs(LOGDIR, exist_ok=True)
-        filename = os.path.join(LOGDIR, logger_filename)
-        handler = logging.handlers.TimedRotatingFileHandler(
-            filename, when="D", utc=True, encoding="utf-8"
-        )
-        handler.setFormatter(formatter)
+    os.makedirs(LOGDIR, exist_ok=True)
+    filename = os.path.join(LOGDIR, logger_filename)
+    handler = logging.handlers.TimedRotatingFileHandler(
+        filename, when="D", utc=True, encoding="utf-8"
+    )
+    handler.setFormatter(formatter)
 
-        for name, item in logging.root.manager.loggerDict.items():
-            if isinstance(item, logging.Logger):
-                item.addHandler(handler)
+    for logger in [stdout_logger, stderr_logger, logger]:
+        if logger in visited_loggers:
+            continue
+        visited_loggers.add(logger)
+        logger.addHandler(handler)
 
     return logger
 
@@ -165,9 +163,11 @@ def violates_moderation(text):
     return flagged
 
 
-# Flan-t5 trained with HF+FSDP saves corrupted  weights for shared embeddings,
-# Use this function to make sure it can be correctly loaded.
 def clean_flant5_ckpt(ckpt_path):
+    """
+    Flan-t5 trained with HF+FSDP saves corrupted  weights for shared embeddings,
+    Use this function to make sure it can be correctly loaded.
+    """
     index_file = os.path.join(ckpt_path, "pytorch_model.bin.index.json")
     index_json = json.load(open(index_file, "r"))
 
@@ -186,11 +186,13 @@ def clean_flant5_ckpt(ckpt_path):
 
 
 def pretty_print_semaphore(semaphore):
+    """Print a semaphore in better format."""
     if semaphore is None:
         return "None"
     return f"Semaphore(value={semaphore._value}, locked={semaphore.locked()})"
 
 
+"""A javascript function to get url parameters for the gradio web server."""
 get_window_url_params_js = """
 function() {
     const params = new URLSearchParams(window.location.search);
@@ -225,3 +227,46 @@ def iter_over_async(
         if done:
             break
         yield obj
+
+
+def detect_language(text: str) -> str:
+    """Detect the langauge of a string."""
+    import polyglot  # pip3 install polyglot pyicu pycld2
+    from polyglot.detect import Detector
+    from polyglot.detect.base import logger as polyglot_logger
+    import pycld2
+
+    polyglot_logger.setLevel("ERROR")
+
+    try:
+        lang_code = Detector(text).language.name
+    except (pycld2.error, polyglot.detect.base.UnknownLanguage):
+        lang_code = "unknown"
+    return lang_code
+
+
+def parse_gradio_auth_creds(filename: str):
+    """Parse a username:password file for gradio authorization."""
+    gradio_auth_creds = []
+    with open(filename, "r", encoding="utf8") as file:
+        for line in file.readlines():
+            gradio_auth_creds += [x.strip() for x in line.split(",") if x.strip()]
+    if gradio_auth_creds:
+        auth = [tuple(cred.split(":")) for cred in gradio_auth_creds]
+    else:
+        auth = None
+    return auth
+
+
+def is_partial_stop(output: str, stop_str: str):
+    """Check whether the output contains a partial stop str."""
+    for i in range(0, min(len(output), len(stop_str))):
+        if stop_str.startswith(output[-i:]):
+            return True
+    return False
+
+
+def run_cmd(cmd: str):
+    """Run a bash command."""
+    print(cmd)
+    os.system(cmd)
