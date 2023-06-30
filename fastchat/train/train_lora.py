@@ -21,13 +21,15 @@ import pathlib
 import typing
 
 from deepspeed import zero
+from deepspeed import comm as dist
 from deepspeed.runtime.zero.partition_parameters import ZeroParamStatus
 from peft import LoraConfig, get_peft_model
 import transformers
 from transformers import Trainer
 
-import sys
+import sys,os
 sys.path.append("/TTS_personal_jiahui.ni/Im-sys/FastChat/")
+os.environ["WANDB_API_KEY"]="c80fd16d325b241c62ff538d4acce35f80cc5b93"
 
 from fastchat.train.train import (
     DataArguments,
@@ -43,6 +45,15 @@ from fastchat.train.train import (
 # replace_llama_attn_with_flash_attn()
 
 
+global_rank = None
+def rank0_print(*args):
+    """print the conversation if the global rank is 0, for multi host application"""
+    global global_rank
+    if(global_rank is None):
+        global_rank = get_global_rank()
+    if(global_rank == 0):
+        print(*args)
+
 @dataclass
 class LoraArguments:
     lora_r: int = 8
@@ -54,6 +65,8 @@ class LoraArguments:
     lora_weight_path: str = ""
     bias: str = "none"
 
+def get_global_rank() -> int:
+    return dist.get_world_rank_from_launcher()
 
 def maybe_zero_3(param):
     if hasattr(param, "ds_id"):
@@ -134,6 +147,7 @@ def train():
     tokenizer.pad_token = tokenizer.unk_token
 
     data_module = make_supervised_data_module(tokenizer=tokenizer, data_args=data_args)
+    rank0_print(f'#train {len(data_module["train_dataset"])}')
     trainer = Trainer(
         model=model, tokenizer=tokenizer, args=training_args, **data_module
     )
