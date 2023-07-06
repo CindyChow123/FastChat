@@ -325,7 +325,7 @@ class PeftModelAdapter:
     def load_model(self, model_path: str,lora_path:str, from_pretrained_kwargs: dict):
         """Loads the base model then the (peft) adapter weights"""
         from peft import PeftConfig, PeftModel
-
+        print("I am the peft")
         config = PeftConfig.from_pretrained(model_path)
         base_model_path = config.base_model_name_or_path
         if "peft" in base_model_path:

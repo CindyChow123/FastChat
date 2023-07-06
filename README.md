@@ -162,6 +162,9 @@ python3 -m fastchat.serve.model_worker --model-path lmsys/vicuna-7b-v1.3
 ```bash
 python -m fastchat.serve.model_worker --model-path /data/Im-sys/ckpts/vicuna-7b-v1.1/ --lora-path /data/Im-sys/ckpts/vicuna-7b-lora-host/13357/ --load-8bit
 ```
+```bash
+python -m fastchat.serve.model_worker --model-path /data/Im-sys/ckpts/vicuna-7b-lora-peft-host/13357/ --load-8bit
+```
 Wait until the process finishes loading the model and you see "Uvicorn running on ...". The model worker will register itself to the controller .
 
 To ensure that your model worker is connected to your controller properly, send a test message using the following command:

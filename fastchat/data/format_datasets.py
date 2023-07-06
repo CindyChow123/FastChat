@@ -71,6 +71,7 @@ def main_json_dataset():
 @dataclass
 class revchatgpt2json:
     roles: Dict = field(default_factory=lambda: {"human": 0, "gpt": 1})
+    roles_inver: Dict = field(default_factory=lambda: {0:"human",1:"gpt"})
     dir: str = "../datasets/"
     users: List[str] = field(
         default_factory=lambda: ["Guest", "Old man", "Old Man", "President"]
@@ -99,6 +100,7 @@ class revchatgpt2json:
         if line[-3:].upper() == "END":
             line = line[:-3]
         if last_role == self.roles[from_who] and len(conv["conversations"]) != 0:
+            line = ' '+line
             conv["conversations"][-1]["value"] += line
         else:
             conv["conversations"].append({"from": from_who, "value": line})
@@ -128,6 +130,8 @@ class revchatgpt2json:
                 elif self.isBot(line):
                     conv = self.add_line(conv, line, last_role, from_who="gpt")
                     last_role = 1
+                elif not line.startswith("END") and len(line)>0 and line[0].isalpha():
+                    conv = self.add_line(conv,line,last_role, from_who=self.roles_inver[last_role])
 
             json.dump(
                 json_content,
@@ -190,6 +194,8 @@ class revchatgpt2json:
             for file in filenames:
                 lines = open(file, "r").readlines()
                 for line in lines:
+                    if line.startswith("No"):
+                        continue
                     begin_pos = line.find("BEGIN")
                     end_pos = line.find("END")
                     # if BEGIN is in the line content, seperate two lines
@@ -237,9 +243,9 @@ class revchatgpt2json:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset-name", type=str, default="RoboEmo/Host_concat")
+    parser.add_argument("--dataset-name", type=str, default="RoboEmo/Host_")
     parser.add_argument("--out-file", type=str, default="RoboEmo/Host_")
-    parser.add_argument("--json-file", type=str, default="RoboEmo/Host_13357.json")
+    parser.add_argument("--json-file", type=str, default="RoboEmo/Host_16719.json")
     parser.add_argument("--begin-cnt", type=int, default=0)
     parser.add_argument("--part", type=bool, default=False)
     args = parser.parse_args()
@@ -250,14 +256,14 @@ if __name__ == "__main__":
     # files = ["/data/Im-sys/FastChat/fastchat/datasets/RoboEmo/Host",
     #          "/data/Im-sys/FastChat/fastchat/datasets/RoboEmo/Host_rev_add_davinci",
     #          "/data/Im-sys/FastChat/fastchat/datasets/RoboEmo/Host_rev_add_davinci_0625",
-    #          "/data/Im-sys/FastChat/fastchat/datasets/RoboEmo/Host_rev_add_davinci_0629"]
+    #          "/data/Im-sys/FastChat/fastchat/datasets/RoboEmo/Host_rev_add_davinci_0626"]
     # rvjson.combine_files(files)
     # rvjson.show_all_roles(args.out_file)
     """Extra, if want to delete the first few roles"""
     # rvjson.delete_before(11638)
 
     """Step two, format into json file"""
-    rvjson.main_revChatGPT_dataset()
+    # rvjson.main_revChatGPT_dataset()
 
     """Check dataset"""
-    # print(rvjson.check_dataset())
+    print(rvjson.check_dataset())
