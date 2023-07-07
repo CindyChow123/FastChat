@@ -97,11 +97,12 @@ class ModelWorker:
             cpu_offloading,
             lora_path,
             gptq_config,
-            lora_path,
         )
         self.conv = get_conversation_template(model_path)
+        
         if self.tokenizer.pad_token == None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
+        logger.info(self.tokenizer.pad_token)
 
         if hasattr(self.model.config, "max_sequence_length"):
             self.context_len = self.model.config.max_sequence_length
