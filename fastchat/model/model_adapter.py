@@ -318,13 +318,15 @@ def remove_parent_directory_name(model_path):
 
 class PeftModelAdapter:
     """Loads any "peft" model and it's base model."""
+
     def match(self, model_path: str):
         """Accepts any model path with "peft" in the name"""
         return "peft" in model_path
 
-    def load_model(self, model_path: str,lora_path:str, from_pretrained_kwargs: dict):
+    def load_model(self, model_path: str, lora_path: str, from_pretrained_kwargs: dict):
         """Loads the base model then the (peft) adapter weights"""
         from peft import PeftConfig, PeftModel
+
         print("I am the peft")
         config = PeftConfig.from_pretrained(model_path)
         base_model_path = config.base_model_name_or_path
@@ -335,7 +337,7 @@ class PeftModelAdapter:
 
         base_adapter = get_model_adapter(base_model_path)
         base_model, tokenizer = base_adapter.load_model(
-            base_model_path, lora_path,from_pretrained_kwargs
+            base_model_path, lora_path, from_pretrained_kwargs
         )
         model = PeftModel.from_pretrained(base_model, model_path)
 

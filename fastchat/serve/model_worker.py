@@ -99,7 +99,7 @@ class ModelWorker:
             gptq_config,
         )
         self.conv = get_conversation_template(model_path)
-        
+
         if self.tokenizer.pad_token == None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
         logger.info(self.tokenizer.pad_token)

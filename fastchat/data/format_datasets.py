@@ -3,7 +3,8 @@ from dataclasses import field, dataclass
 import argparse
 from tqdm import tqdm
 from typing import List, Tuple, Any, Dict, Set, Optional
-'''
+
+"""
 from datasets import load_dataset
 
 
@@ -55,7 +56,7 @@ def format_prosocial_dialog(dataset):
 
     return output
 
-'''
+
 def main_json_dataset():
     dataset = load_dataset(args.dataset_name)
     if args.dataset_name == "conv_ai_2":
@@ -66,12 +67,13 @@ def main_json_dataset():
             output = format_prosocial_dialog(dataset[key])
             json.dump(output, open(dir + key + "_" + args.out_file, "w"), indent=2)
             print(f"{key}:{len(output)}")
+"""
 
 
 @dataclass
 class revchatgpt2json:
     roles: Dict = field(default_factory=lambda: {"human": 0, "gpt": 1})
-    roles_inver: Dict = field(default_factory=lambda: {0:"human",1:"gpt"})
+    roles_inver: Dict = field(default_factory=lambda: {0: "human", 1: "gpt"})
     dir: str = "../datasets/"
     users: List[str] = field(
         default_factory=lambda: ["Guest", "Old man", "Old Man", "President"]
@@ -100,7 +102,7 @@ class revchatgpt2json:
         if line[-3:].upper() == "END":
             line = line[:-3]
         if last_role == self.roles[from_who] and len(conv["conversations"]) != 0:
-            line = ' '+line
+            line = " " + line
             conv["conversations"][-1]["value"] += line
         else:
             conv["conversations"].append({"from": from_who, "value": line})
@@ -130,8 +132,10 @@ class revchatgpt2json:
                 elif self.isBot(line):
                     conv = self.add_line(conv, line, last_role, from_who="gpt")
                     last_role = 1
-                elif not line.startswith("END") and len(line)>0 and line[0].isalpha():
-                    conv = self.add_line(conv,line,last_role, from_who=self.roles_inver[last_role])
+                elif not line.startswith("END") and len(line) > 0 and line[0].isalpha():
+                    conv = self.add_line(
+                        conv, line, last_role, from_who=self.roles_inver[last_role]
+                    )
 
             json.dump(
                 json_content,
