@@ -163,7 +163,7 @@ python3 -m fastchat.serve.model_worker --model-path lmsys/vicuna-7b-v1.3
 python -m fastchat.serve.model_worker --model-path /data/Im-sys/ckpts/vicuna-7b-v1.1/ --lora-path /data/Im-sys/ckpts/vicuna-7b-lora-host/13357/ --load-8bit
 ```
 ```bash
-python -m fastchat.serve.model_worker --model-path /data/Im-sys/ckpts/vicuna-7b-lora-peft-host/13357/ --load-8bit
+python -m fastchat.serve.model_worker --model-path /data/Im-sys/ckpts/vicuna-7b-lora-peft-host/13357/ --load-8bit --model-name vicuna-7b-lora
 ```
 Wait until the process finishes loading the model and you see "Uvicorn running on ...". The model worker will register itself to the controller .
 

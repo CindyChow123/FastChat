@@ -202,7 +202,7 @@ def clear_history(request: gr.Request):
 
 def add_text(state, model_selector, text, request: gr.Request):
     ip = request.client.host
-    logger.info(f"add_text. ip: {ip}. len: {len(text)}")
+    logger.info(f"add_text. ip: {ip}. len: {text}")
 
     if state is None:
         state = State(model_selector)

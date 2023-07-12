@@ -3,7 +3,7 @@ from dataclasses import field, dataclass
 import argparse
 from tqdm import tqdm
 from typing import List, Tuple, Any, Dict, Set, Optional
-
+'''
 from datasets import load_dataset
 
 
@@ -55,7 +55,7 @@ def format_prosocial_dialog(dataset):
 
     return output
 
-
+'''
 def main_json_dataset():
     dataset = load_dataset(args.dataset_name)
     if args.dataset_name == "conv_ai_2":
