@@ -198,10 +198,23 @@ function() {
     const params = new URLSearchParams(window.location.search);
     url_params = Object.fromEntries(params);
     console.log("url_params", url_params);
+    sessionStorage.setItem("id","Cindy's first guest");
     return url_params;
     }
 """
 
+get_session_id = """
+function() {
+    const p = sessionStorage.getItem("id");
+    sid = p;
+    console.log("sid",sid);
+    }
+"""
+# get_session_id = """
+# function() {
+#     console.log(sessionStorage.getItem("id"));
+# }
+# """
 
 def iter_over_async(
     async_gen: AsyncGenerator, event_loop: AbstractEventLoop

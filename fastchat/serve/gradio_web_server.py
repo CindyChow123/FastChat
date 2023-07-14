@@ -40,6 +40,7 @@ from fastchat.utils import (
     violates_moderation,
     get_window_url_params_js,
     parse_gradio_auth_creds,
+    get_session_id,
 )
 
 
@@ -61,6 +62,8 @@ The service is a research preview intended for non-commercial use only, subject 
 
 ip_expiration_dict = defaultdict(lambda: 0)
 
+static_ip = "113.110.228.121" # request.client.host
+# sid=gr.JSON(visible=False)
 
 class State:
     def __init__(self, model_name):
@@ -146,8 +149,8 @@ def load_demo_single(models, url_params):
 def load_demo(url_params, request: gr.Request):
     global models
 
-    ip = request.client.host
-    logger.info(f"load_demo. ip: {ip}. params: {url_params}")
+    ip = static_ip
+    logger.info(f"load_demo. ip: {ip}. params: {url_params}, client: {request.client}")
     ip_expiration_dict[ip] = time.time() + SESSION_EXPIRATION_TIME
 
     if args.model_list_mode == "reload":
@@ -165,44 +168,44 @@ def vote_last_response(state, vote_type, model_selector, request: gr.Request):
             "type": vote_type,
             "model": model_selector,
             "state": state.dict(),
-            "ip": request.client.host,
+            "ip": static_ip,
         }
         fout.write(json.dumps(data) + "\n")
 
 
 def upvote_last_response(state, model_selector, request: gr.Request):
-    logger.info(f"upvote. ip: {request.client.host}")
+    logger.info(f"upvote. ip: {static_ip}")
     vote_last_response(state, "upvote", model_selector, request)
     return ("",) + (disable_btn,) * 3
 
 
 def downvote_last_response(state, model_selector, request: gr.Request):
-    logger.info(f"downvote. ip: {request.client.host}")
+    logger.info(f"downvote. ip: {static_ip}")
     vote_last_response(state, "downvote", model_selector, request)
     return ("",) + (disable_btn,) * 3
 
 
 def flag_last_response(state, model_selector, request: gr.Request):
-    logger.info(f"flag. ip: {request.client.host}")
+    logger.info(f"flag. ip: {static_ip}")
     vote_last_response(state, "flag", model_selector, request)
     return ("",) + (disable_btn,) * 3
 
 
 def regenerate(state, request: gr.Request):
-    logger.info(f"regenerate. ip: {request.client.host}")
+    logger.info(f"regenerate. ip: {static_ip}")
     state.conv.update_last_message(None)
     return (state, state.to_gradio_chatbot(), "") + (disable_btn,) * 5
 
 
 def clear_history(request: gr.Request):
-    logger.info(f"clear_history. ip: {request.client.host}")
+    logger.info(f"clear_history. ip: {static_ip}")
     state = None
     return (state, [], "") + (disable_btn,) * 5
 
 
 def add_text(state, model_selector, text, request: gr.Request):
-    ip = request.client.host
-    logger.info(f"add_text. ip: {ip}. len: {text}")
+    ip = static_ip
+    logger.info(f"add_text. ip: {ip}. len: {text}, client: {request.client}")
 
     if state is None:
         state = State(model_selector)
@@ -212,14 +215,15 @@ def add_text(state, model_selector, text, request: gr.Request):
         return (state, state.to_gradio_chatbot(), "") + (no_change_btn,) * 5
 
     if ip_expiration_dict[ip] < time.time():
-        logger.info(f"inactive. ip: {request.client.host}. text: {text}")
+        print(f'ip:{ip_expiration_dict},cur time:{time.time()}')
+        logger.info(f"inactive. ip: {static_ip}. text: {text}")
         state.skip_next = True
         return (state, state.to_gradio_chatbot(), INACTIVE_MSG) + (no_change_btn,) * 5
 
     if enable_moderation:
         flagged = violates_moderation(text)
         if flagged:
-            logger.info(f"violate moderation. ip: {request.client.host}. text: {text}")
+            logger.info(f"violate moderation. ip: {static_ip}. text: {text}")
             state.skip_next = True
             return (state, state.to_gradio_chatbot(), MODERATION_MSG) + (
                 no_change_btn,
@@ -227,7 +231,7 @@ def add_text(state, model_selector, text, request: gr.Request):
 
     conv = state.conv
     if (len(conv.messages) - conv.offset) // 2 >= CONVERSATION_TURN_LIMIT:
-        logger.info(f"conversation turn limit. ip: {request.client.host}. text: {text}")
+        logger.info(f"conversation turn limit. ip: {static_ip}. text: {text}")
         state.skip_next = True
         return (state, state.to_gradio_chatbot(), CONVERSATION_LIMIT_MSG) + (
             no_change_btn,
@@ -289,7 +293,7 @@ def model_worker_stream_iter(
 
 
 def bot_response(state, temperature, top_p, max_new_tokens, request: gr.Request):
-    logger.info(f"bot_response. ip: {request.client.host}")
+    logger.info(f"bot_response. ip: {static_ip}")
     start_tstamp = time.time()
     temperature = float(temperature)
     top_p = float(top_p)
@@ -429,7 +433,7 @@ def bot_response(state, temperature, top_p, max_new_tokens, request: gr.Request)
             "start": round(start_tstamp, 4),
             "finish": round(finish_tstamp, 4),
             "state": state.dict(),
-            "ip": request.client.host,
+            "ip": static_ip,
         }
         fout.write(json.dumps(data) + "\n")
 

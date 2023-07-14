@@ -76,7 +76,6 @@ class ModelWorker:
         max_gpu_memory,
         load_8bit=False,
         cpu_offloading=False,
-        lora_path=None,
         gptq_config=None,
     ):
         self.controller_addr = controller_addr
@@ -95,7 +94,6 @@ class ModelWorker:
             max_gpu_memory,
             load_8bit,
             cpu_offloading,
-            lora_path,
             gptq_config,
         )
         self.conv = get_conversation_template(model_path)
@@ -477,7 +475,6 @@ if __name__ == "__main__":
         args.max_gpu_memory,
         args.load_8bit,
         args.cpu_offloading,
-        args.lora_path,
         gptq_config,
     )
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")

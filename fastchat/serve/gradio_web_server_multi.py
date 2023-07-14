@@ -29,6 +29,7 @@ from fastchat.serve.gradio_web_server import (
     get_model_list,
     load_demo_single,
     ip_expiration_dict,
+    static_ip
 )
 from fastchat.serve.monitor.monitor import build_leaderboard_tab
 from fastchat.utils import (
@@ -43,7 +44,7 @@ logger = build_logger("gradio_web_server_multi", "gradio_web_server_multi.log")
 def load_demo(url_params, request: gr.Request):
     global models
 
-    ip = request.client.host
+    ip = static_ip
     logger.info(f"load_demo. ip: {ip}. params: {url_params}")
     ip_expiration_dict[ip] = time.time() + SESSION_EXPIRATION_TIME
 
@@ -190,7 +191,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--controller-url",
         type=str,
-        default="http://localhost:21001",
+        default="http://0.0.0.0:21001",
         help="The address of the controller.",
     )
     parser.add_argument(

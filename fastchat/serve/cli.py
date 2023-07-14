@@ -245,7 +245,6 @@ def main(args):
             args.revision,
             args.debug,
             args.use_deepspeed,
-            args.lora_path,
         )
     except KeyboardInterrupt:
         print("exit...")

@@ -165,6 +165,11 @@ python -m fastchat.serve.model_worker --model-path /data/Im-sys/ckpts/vicuna-7b-
 ```bash
 python -m fastchat.serve.model_worker --model-path /data/Im-sys/ckpts/vicuna-7b-lora-peft-host/13357/ --load-8bit --model-name vicuna-7b-lora
 ```
+```bash
+python -m fastchat.serve.model_worker --model-path /data/Weights/65B --model-name vicuna-65b --num-gpus 5
+python -m fastchat.serve.model_worker --model-path /data/Weights/vicuna-7b-peft-lora-13357s --model-name vicuna-lora-7b --num-gpus 1
+python -m fastchat.serve.model_worker --model-path /data/Weights/vicuna-13b-lora --model-name vicuna-lora-13b --num-gpus 1
+```
 Wait until the process finishes loading the model and you see "Uvicorn running on ...". The model worker will register itself to the controller .
 
 To ensure that your model worker is connected to your controller properly, send a test message using the following command:
@@ -190,6 +195,7 @@ If the models do not show up, try to reboot the gradio web server.
 CUDA_VISIBLE_DEVICES=0 python3 -m fastchat.serve.model_worker --model-path lmsys/vicuna-7b-v1.3 --controller http://localhost:21001 --port 31000 --worker http://localhost:31000
 # worker 1
 CUDA_VISIBLE_DEVICES=1 python3 -m fastchat.serve.model_worker --model-path lmsys/fastchat-t5-3b-v1.0 --controller http://localhost:21001 --port 31001 --worker http://localhost:31001
+CUDA_VISIBLE_DEVICES=7 python -m fastchat.serve.model_worker --model-path /data/Weights/vicuna_13b_peft_lora --model-name vicuna-lora-13b --num-gpus 1 --port 21004 --controller http://0.0.0.0:21001 --worker-address http://0.0.0.0:21004
 ```
 - You can also launch a multi-tab gradio server, which includes the Chatbot Arena tabs.
 ```bash

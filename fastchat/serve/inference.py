@@ -257,7 +257,6 @@ def chat_loop(
     revision: str,
     debug: bool,
     use_deepspeed: bool = False,
-    lora_path: Optional[str] = None,
 ):
     # Model
     model, tokenizer = load_model(
@@ -271,7 +270,6 @@ def chat_loop(
         revision,
         debug,
         use_deepspeed,
-        lora_path,
     )
     is_chatglm = "chatglm" in str(type(model)).lower()
     is_t5 = "t5" in str(type(model)).lower()
