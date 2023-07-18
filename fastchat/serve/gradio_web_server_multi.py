@@ -6,6 +6,7 @@ It supports chatting with a single model or chatting with two models side-by-sid
 import argparse
 import pickle
 import time
+import uuid
 
 import gradio as gr
 
@@ -29,7 +30,6 @@ from fastchat.serve.gradio_web_server import (
     get_model_list,
     load_demo_single,
     ip_expiration_dict,
-    static_ip
 )
 from fastchat.serve.monitor.monitor import build_leaderboard_tab
 from fastchat.utils import (
@@ -44,9 +44,10 @@ logger = build_logger("gradio_web_server_multi", "gradio_web_server_multi.log")
 def load_demo(url_params, request: gr.Request):
     global models
 
-    ip = static_ip
+    ip = request.client.host
+    session_id = uuid.uuid4().hex
     logger.info(f"load_demo. ip: {ip}. params: {url_params}")
-    ip_expiration_dict[ip] = time.time() + SESSION_EXPIRATION_TIME
+    ip_expiration_dict[session_id] = time.time() + SESSION_EXPIRATION_TIME
 
     selected = 0
     if "arena" in url_params:
@@ -64,7 +65,7 @@ def load_demo(url_params, request: gr.Request):
                 args.controller_url, args.add_chatgpt, args.add_claude, args.add_palm
             )
 
-    single_updates = load_demo_single(models, url_params)
+    single_updates = load_demo_single(models, url_params,session_id)
 
     models_anony = list(models)
     if args.anony_only_for_proprietary_model:
@@ -102,6 +103,7 @@ def build_demo(models, elo_results_file, leaderboard_table_file):
                     a_send_btn,
                     a_button_row,
                     a_parameter_row,
+                    a_session_id,
                 ) = build_single_model_ui(models)
                 a_list = [
                     a_state,
@@ -111,6 +113,7 @@ def build_demo(models, elo_results_file, leaderboard_table_file):
                     a_send_btn,
                     a_button_row,
                     a_parameter_row,
+                    a_session_id,
                 ]
 
             with gr.Tab("Chatbot Arena (battle)", id=1):
@@ -123,7 +126,7 @@ def build_demo(models, elo_results_file, leaderboard_table_file):
                     b_button_row,
                     b_button_row2,
                     b_parameter_row,
-                ) = build_side_by_side_ui_anony(models)
+                ) = build_side_by_side_ui_anony(models,a_session_id)
                 b_list = (
                     b_states
                     + b_model_selectors
@@ -147,7 +150,7 @@ def build_demo(models, elo_results_file, leaderboard_table_file):
                     c_button_row,
                     c_button_row2,
                     c_parameter_row,
-                ) = build_side_by_side_ui_named(models)
+                ) = build_side_by_side_ui_named(models,a_session_id)
                 c_list = (
                     c_states
                     + c_model_selectors

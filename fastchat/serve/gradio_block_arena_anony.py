@@ -192,10 +192,10 @@ model_pairs_weights = []
 
 
 def add_text(
-    state0, state1, model_selector0, model_selector1, text, request: gr.Request
+    state0, state1,session_id, model_selector0, model_selector1, text, request: gr.Request
 ):
     ip = request.client.host
-    logger.info(f"add_text (anony). ip: {ip}. len: {len(text)}")
+    logger.info(f"add_text (anony). ip: {ip}. len: {len(text)},sid:{session_id}")
     states = [state0, state1]
     model_selectors = [model_selector0, model_selector1]
 
@@ -246,7 +246,7 @@ def add_text(
             * 6
         )
 
-    if ip_expiration_dict[ip] < time.time():
+    if ip_expiration_dict[session_id] < time.time():
         logger.info(f"inactive (anony). ip: {request.client.host}. text: {text}")
         for i in range(num_sides):
             states[i].skip_next = True
@@ -358,7 +358,7 @@ def bot_response_multi(
             break
 
 
-def build_side_by_side_ui_anony(models):
+def build_side_by_side_ui_anony(models,session_id):
     notice_markdown = """
 # ⚔️  Chatbot Arena ⚔️ 
 ### Rules
@@ -512,7 +512,7 @@ function (a, b, c, d) {
 
     textbox.submit(
         add_text,
-        states + model_selectors + [textbox],
+        states + [session_id] + model_selectors + [textbox],
         states + chatbots + [textbox] + btn_list,
     ).then(
         bot_response_multi,
@@ -524,7 +524,7 @@ function (a, b, c, d) {
 
     send_btn.click(
         add_text,
-        states + model_selectors + [textbox],
+        states + [session_id] + model_selectors + [textbox],
         states + chatbots + [textbox] + btn_list,
     ).then(
         bot_response_multi,

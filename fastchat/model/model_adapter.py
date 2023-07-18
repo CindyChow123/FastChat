@@ -370,17 +370,10 @@ class VicunaAdapter(BaseModelAdapter):
         model = AutoModelForCausalLM.from_pretrained(
             model_path,
             low_cpu_mem_usage=True,
-            device_map="auto",
+            # device_map="auto",
             **from_pretrained_kwargs,
         )
         self.raise_warning_for_old_weights(model)
-        # if lora_path:
-        #     model = PeftModel.from_pretrained(
-        #         model,
-        #         lora_path,  # specific checkpoint path from "Chinese-Vicuna/Chinese-Vicuna-lora-7b-belle-and-guanaco"
-        #         torch_dtype=torch.float16,
-        #         device_map={"": 0},
-        #     )
         return model, tokenizer
 
     def get_default_conv_template(self, model_path: str) -> Conversation:

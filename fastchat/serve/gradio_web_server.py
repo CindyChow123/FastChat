@@ -62,8 +62,6 @@ The service is a research preview intended for non-commercial use only, subject 
 
 ip_expiration_dict = defaultdict(lambda: 0)
 
-static_ip = "113.110.228.121" # request.client.host
-# sid=gr.JSON(visible=False)
 
 class State:
     def __init__(self, model_name):
@@ -123,7 +121,7 @@ def get_model_list(controller_url, add_chatgpt, add_claude, add_palm):
     return models
 
 
-def load_demo_single(models, url_params):
+def load_demo_single(models, url_params,session_id):
     selected_model = models[0] if len(models) > 0 else ""
     if "model" in url_params:
         model = url_params["model"]
@@ -143,22 +141,24 @@ def load_demo_single(models, url_params):
         gr.Button.update(visible=True),
         gr.Row.update(visible=True),
         gr.Accordion.update(visible=True),
+        session_id,
     )
 
 
 def load_demo(url_params, request: gr.Request):
     global models
 
-    ip = static_ip
+    ip = request.client.host
+    session_id = uuid.uuid4().hex
     logger.info(f"load_demo. ip: {ip}. params: {url_params}, client: {request.client}")
-    ip_expiration_dict[ip] = time.time() + SESSION_EXPIRATION_TIME
+    ip_expiration_dict[session_id] = time.time() + SESSION_EXPIRATION_TIME
 
     if args.model_list_mode == "reload":
         models = get_model_list(
             controller_url, args.add_chatgpt, args.add_claude, args.add_palm
         )
 
-    return load_demo_single(models, url_params)
+    return load_demo_single(models, url_params,session_id)
 
 
 def vote_last_response(state, vote_type, model_selector, request: gr.Request):
@@ -168,79 +168,79 @@ def vote_last_response(state, vote_type, model_selector, request: gr.Request):
             "type": vote_type,
             "model": model_selector,
             "state": state.dict(),
-            "ip": static_ip,
+            "ip": request.client.host,
         }
         fout.write(json.dumps(data) + "\n")
 
 
 def upvote_last_response(state, model_selector, request: gr.Request):
-    logger.info(f"upvote. ip: {static_ip}")
+    logger.info(f"upvote. ip: {request.client.host}")
     vote_last_response(state, "upvote", model_selector, request)
     return ("",) + (disable_btn,) * 3
 
 
 def downvote_last_response(state, model_selector, request: gr.Request):
-    logger.info(f"downvote. ip: {static_ip}")
+    logger.info(f"downvote. ip: {request.client.host}")
     vote_last_response(state, "downvote", model_selector, request)
     return ("",) + (disable_btn,) * 3
 
 
 def flag_last_response(state, model_selector, request: gr.Request):
-    logger.info(f"flag. ip: {static_ip}")
+    logger.info(f"flag. ip: {request.client.host}")
     vote_last_response(state, "flag", model_selector, request)
     return ("",) + (disable_btn,) * 3
 
 
 def regenerate(state, request: gr.Request):
-    logger.info(f"regenerate. ip: {static_ip}")
+    logger.info(f"regenerate. ip: {request.client.host}")
     state.conv.update_last_message(None)
     return (state, state.to_gradio_chatbot(), "") + (disable_btn,) * 5
 
 
 def clear_history(request: gr.Request):
-    logger.info(f"clear_history. ip: {static_ip}")
+    logger.info(f"clear_history. ip: {request.client.host}")
     state = None
     return (state, [], "") + (disable_btn,) * 5
 
 
-def add_text(state, model_selector, text, request: gr.Request):
-    ip = static_ip
-    logger.info(f"add_text. ip: {ip}. len: {text}, client: {request.client}")
+def add_text(state ,session_id,model_selector, text, request: gr.Request):
+    ip = request.client.host
+    logger.info(f"add_text. ip: {ip}. len: {text}, client: {request.client},sid: {session_id}")
 
     if state is None:
         state = State(model_selector)
 
     if len(text) <= 0:
         state.skip_next = True
-        return (state, state.to_gradio_chatbot(), "") + (no_change_btn,) * 5
+        return (state,session_id, state.to_gradio_chatbot(), "") + (no_change_btn,) * 5
 
-    if ip_expiration_dict[ip] < time.time():
+    if ip_expiration_dict[session_id] < time.time():
         print(f'ip:{ip_expiration_dict},cur time:{time.time()}')
-        logger.info(f"inactive. ip: {static_ip}. text: {text}")
+        logger.info(f"inactive. ip: {request.client.host}. text: {text}")
         state.skip_next = True
-        return (state, state.to_gradio_chatbot(), INACTIVE_MSG) + (no_change_btn,) * 5
+        return (state,session_id, state.to_gradio_chatbot(), INACTIVE_MSG) + (no_change_btn,) * 5
 
     if enable_moderation:
         flagged = violates_moderation(text)
         if flagged:
-            logger.info(f"violate moderation. ip: {static_ip}. text: {text}")
+            logger.info(f"violate moderation. ip: {request.client.host}. text: {text}")
             state.skip_next = True
-            return (state, state.to_gradio_chatbot(), MODERATION_MSG) + (
+            return (state,session_id, state.to_gradio_chatbot(), MODERATION_MSG) + (
                 no_change_btn,
             ) * 5
 
     conv = state.conv
     if (len(conv.messages) - conv.offset) // 2 >= CONVERSATION_TURN_LIMIT:
-        logger.info(f"conversation turn limit. ip: {static_ip}. text: {text}")
+        logger.info(f"conversation turn limit. ip: {request.client.host}. text: {text}")
         state.skip_next = True
-        return (state, state.to_gradio_chatbot(), CONVERSATION_LIMIT_MSG) + (
+        return (state,session_id, state.to_gradio_chatbot(), CONVERSATION_LIMIT_MSG) + (
             no_change_btn,
         ) * 5
 
     text = text[:INPUT_CHAR_LEN_LIMIT]  # Hard cut-off
     conv.append_message(conv.roles[0], text)
     conv.append_message(conv.roles[1], None)
-    return (state, state.to_gradio_chatbot(), "") + (disable_btn,) * 5
+    return (state,session_id, state.to_gradio_chatbot(), "") + (disable_btn,) * 5
 
 
 def post_process_code(code):
@@ -293,7 +293,7 @@ def model_worker_stream_iter(
 
 
 def bot_response(state, temperature, top_p, max_new_tokens, request: gr.Request):
-    logger.info(f"bot_response. ip: {static_ip}")
+    logger.info(f"bot_response. ip: {request.client.host}")
     start_tstamp = time.time()
     temperature = float(temperature)
     top_p = float(top_p)
@@ -433,7 +433,7 @@ def bot_response(state, temperature, top_p, max_new_tokens, request: gr.Request)
             "start": round(start_tstamp, 4),
             "finish": round(finish_tstamp, 4),
             "state": state.dict(),
-            "ip": static_ip,
+            "ip": request.client.host,
         }
         fout.write(json.dumps(data) + "\n")
 
@@ -504,6 +504,7 @@ By using this service, users are required to agree to the following terms: The s
 """
 
     state = gr.State()
+    session_id = gr.State()
     model_description_md = get_model_description_md(models)
     gr.Markdown(notice_markdown + model_description_md, elem_id="notice_markdown")
 
@@ -595,21 +596,21 @@ By using this service, users are required to agree to the following terms: The s
     model_selector.change(clear_history, None, [state, chatbot, textbox] + btn_list)
 
     textbox.submit(
-        add_text, [state, model_selector, textbox], [state, chatbot, textbox] + btn_list
+        add_text, [state,session_id, model_selector, textbox], [state,session_id, chatbot, textbox] + btn_list
     ).then(
         bot_response,
         [state, temperature, top_p, max_output_tokens],
         [state, chatbot] + btn_list,
     )
     send_btn.click(
-        add_text, [state, model_selector, textbox], [state, chatbot, textbox] + btn_list
+        add_text, [state,session_id, model_selector, textbox], [state,session_id, chatbot, textbox] + btn_list
     ).then(
         bot_response,
         [state, temperature, top_p, max_output_tokens],
         [state, chatbot] + btn_list,
     )
 
-    return state, model_selector, chatbot, textbox, send_btn, button_row, parameter_row
+    return state, model_selector, chatbot, textbox, send_btn, button_row, parameter_row, session_id
 
 
 def build_demo(models):
@@ -628,6 +629,7 @@ def build_demo(models):
             send_btn,
             button_row,
             parameter_row,
+            session_id,
         ) = build_single_model_ui(models)
 
         if args.model_list_mode not in ["once", "reload"]:
@@ -643,6 +645,7 @@ def build_demo(models):
                 send_btn,
                 button_row,
                 parameter_row,
+                session_id,
             ],
             _js=get_window_url_params_js,
         )
