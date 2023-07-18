@@ -121,7 +121,7 @@ def get_model_list(controller_url, add_chatgpt, add_claude, add_palm):
     return models
 
 
-def load_demo_single(models, url_params,session_id):
+def load_demo_single(models, url_params, session_id):
     selected_model = models[0] if len(models) > 0 else ""
     if "model" in url_params:
         model = url_params["model"]
@@ -158,7 +158,7 @@ def load_demo(url_params, request: gr.Request):
             controller_url, args.add_chatgpt, args.add_claude, args.add_palm
         )
 
-    return load_demo_single(models, url_params,session_id)
+    return load_demo_single(models, url_params, session_id)
 
 
 def vote_last_response(state, vote_type, model_selector, request: gr.Request):
@@ -203,29 +203,33 @@ def clear_history(request: gr.Request):
     return (state, [], "") + (disable_btn,) * 5
 
 
-def add_text(state ,session_id,model_selector, text, request: gr.Request):
+def add_text(state, session_id, model_selector, text, request: gr.Request):
     ip = request.client.host
-    logger.info(f"add_text. ip: {ip}. len: {text}, client: {request.client},sid: {session_id}")
+    logger.info(
+        f"add_text. ip: {ip}. len: {text}, client: {request.client},sid: {session_id}"
+    )
 
     if state is None:
         state = State(model_selector)
 
     if len(text) <= 0:
         state.skip_next = True
-        return (state,session_id, state.to_gradio_chatbot(), "") + (no_change_btn,) * 5
+        return (state, session_id, state.to_gradio_chatbot(), "") + (no_change_btn,) * 5
 
     if ip_expiration_dict[session_id] < time.time():
-        print(f'ip:{ip_expiration_dict},cur time:{time.time()}')
+        print(f"ip:{ip_expiration_dict},cur time:{time.time()}")
         logger.info(f"inactive. ip: {request.client.host}. text: {text}")
         state.skip_next = True
-        return (state,session_id, state.to_gradio_chatbot(), INACTIVE_MSG) + (no_change_btn,) * 5
+        return (state, session_id, state.to_gradio_chatbot(), INACTIVE_MSG) + (
+            no_change_btn,
+        ) * 5
 
     if enable_moderation:
         flagged = violates_moderation(text)
         if flagged:
             logger.info(f"violate moderation. ip: {request.client.host}. text: {text}")
             state.skip_next = True
-            return (state,session_id, state.to_gradio_chatbot(), MODERATION_MSG) + (
+            return (state, session_id, state.to_gradio_chatbot(), MODERATION_MSG) + (
                 no_change_btn,
             ) * 5
 
@@ -233,14 +237,17 @@ def add_text(state ,session_id,model_selector, text, request: gr.Request):
     if (len(conv.messages) - conv.offset) // 2 >= CONVERSATION_TURN_LIMIT:
         logger.info(f"conversation turn limit. ip: {request.client.host}. text: {text}")
         state.skip_next = True
-        return (state,session_id, state.to_gradio_chatbot(), CONVERSATION_LIMIT_MSG) + (
-            no_change_btn,
-        ) * 5
+        return (
+            state,
+            session_id,
+            state.to_gradio_chatbot(),
+            CONVERSATION_LIMIT_MSG,
+        ) + (no_change_btn,) * 5
 
     text = text[:INPUT_CHAR_LEN_LIMIT]  # Hard cut-off
     conv.append_message(conv.roles[0], text)
     conv.append_message(conv.roles[1], None)
-    return (state,session_id, state.to_gradio_chatbot(), "") + (disable_btn,) * 5
+    return (state, session_id, state.to_gradio_chatbot(), "") + (disable_btn,) * 5
 
 
 def post_process_code(code):
@@ -596,21 +603,34 @@ By using this service, users are required to agree to the following terms: The s
     model_selector.change(clear_history, None, [state, chatbot, textbox] + btn_list)
 
     textbox.submit(
-        add_text, [state,session_id, model_selector, textbox], [state,session_id, chatbot, textbox] + btn_list
+        add_text,
+        [state, session_id, model_selector, textbox],
+        [state, session_id, chatbot, textbox] + btn_list,
     ).then(
         bot_response,
         [state, temperature, top_p, max_output_tokens],
         [state, chatbot] + btn_list,
     )
     send_btn.click(
-        add_text, [state,session_id, model_selector, textbox], [state,session_id, chatbot, textbox] + btn_list
+        add_text,
+        [state, session_id, model_selector, textbox],
+        [state, session_id, chatbot, textbox] + btn_list,
     ).then(
         bot_response,
         [state, temperature, top_p, max_output_tokens],
         [state, chatbot] + btn_list,
     )
 
-    return state, model_selector, chatbot, textbox, send_btn, button_row, parameter_row, session_id
+    return (
+        state,
+        model_selector,
+        chatbot,
+        textbox,
+        send_btn,
+        button_row,
+        parameter_row,
+        session_id,
+    )
 
 
 def build_demo(models):

@@ -65,7 +65,7 @@ def load_demo(url_params, request: gr.Request):
                 args.controller_url, args.add_chatgpt, args.add_claude, args.add_palm
             )
 
-    single_updates = load_demo_single(models, url_params,session_id)
+    single_updates = load_demo_single(models, url_params, session_id)
 
     models_anony = list(models)
     if args.anony_only_for_proprietary_model:
@@ -126,7 +126,7 @@ def build_demo(models, elo_results_file, leaderboard_table_file):
                     b_button_row,
                     b_button_row2,
                     b_parameter_row,
-                ) = build_side_by_side_ui_anony(models,a_session_id)
+                ) = build_side_by_side_ui_anony(models, a_session_id)
                 b_list = (
                     b_states
                     + b_model_selectors
@@ -150,7 +150,7 @@ def build_demo(models, elo_results_file, leaderboard_table_file):
                     c_button_row,
                     c_button_row2,
                     c_parameter_row,
-                ) = build_side_by_side_ui_named(models,a_session_id)
+                ) = build_side_by_side_ui_named(models, a_session_id)
                 c_list = (
                     c_states
                     + c_model_selectors

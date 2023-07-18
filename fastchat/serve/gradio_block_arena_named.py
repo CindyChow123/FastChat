@@ -149,7 +149,13 @@ def share_click(state0, state1, model_selector0, model_selector1, request: gr.Re
 
 
 def add_text(
-    state0, state1,session_id, model_selector0, model_selector1, text, request: gr.Request
+    state0,
+    state1,
+    session_id,
+    model_selector0,
+    model_selector1,
+    text,
+    request: gr.Request,
 ):
     ip = request.client.host
     logger.info(f"add_text (named). ip: {ip}. len: {len(text)}, sid:{session_id}")
@@ -296,7 +302,7 @@ def flash_buttons():
         time.sleep(0.2)
 
 
-def build_side_by_side_ui_named(models,session_id):
+def build_side_by_side_ui_named(models, session_id):
     notice_markdown = """
 # ⚔️  Chatbot Arena ⚔️ 
 ### Rules

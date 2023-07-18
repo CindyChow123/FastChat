@@ -216,6 +216,7 @@ function() {
 # }
 # """
 
+
 def iter_over_async(
     async_gen: AsyncGenerator, event_loop: AbstractEventLoop
 ) -> Generator:

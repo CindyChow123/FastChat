@@ -192,7 +192,13 @@ model_pairs_weights = []
 
 
 def add_text(
-    state0, state1,session_id, model_selector0, model_selector1, text, request: gr.Request
+    state0,
+    state1,
+    session_id,
+    model_selector0,
+    model_selector1,
+    text,
+    request: gr.Request,
 ):
     ip = request.client.host
     logger.info(f"add_text (anony). ip: {ip}. len: {len(text)},sid:{session_id}")
@@ -358,7 +364,7 @@ def bot_response_multi(
             break
 
 
-def build_side_by_side_ui_anony(models,session_id):
+def build_side_by_side_ui_anony(models, session_id):
     notice_markdown = """
 # ⚔️  Chatbot Arena ⚔️ 
 ### Rules
