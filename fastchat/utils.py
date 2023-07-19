@@ -198,7 +198,6 @@ function() {
     const params = new URLSearchParams(window.location.search);
     url_params = Object.fromEntries(params);
     console.log("url_params", url_params);
-    sessionStorage.setItem("id","Cindy's first guest");
     return url_params;
     }
 """
