@@ -24,7 +24,9 @@ output
 # Data
 *.pkl
 *.csv
-datasets
+Host*
+Conv*
+Prompts*
 
 # Docker
 *.yml
