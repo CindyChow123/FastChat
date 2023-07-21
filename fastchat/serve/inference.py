@@ -79,8 +79,9 @@ def generate_stream(
     else:
         max_src_len = context_len - max_new_tokens - 8
 
-    input_ids = input_ids[-max_src_len:]
     input_echo_len = len(input_ids)
+    input_ids = input_ids[-max_src_len:]
+    
 
     if model.config.is_encoder_decoder:
         encoder_output = model.encoder(
