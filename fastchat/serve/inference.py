@@ -81,7 +81,6 @@ def generate_stream(
 
     input_echo_len = len(input_ids)
     input_ids = input_ids[-max_src_len:]
-    
 
     if model.config.is_encoder_decoder:
         encoder_output = model.encoder(
