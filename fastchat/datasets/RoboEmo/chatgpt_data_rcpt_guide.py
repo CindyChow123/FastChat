@@ -1,5 +1,6 @@
 import asyncio, dataclasses, requests, openai, json, time, argparse, os, httpx
 from typing import List, Tuple, Any, Dict, Set, Optional
+from prompts import Rcpt_Guide_Prompt
 
 from revChatGPT.V1 import Chatbot, AsyncChatbot
 
@@ -8,52 +9,8 @@ python gen_revChatGPT.py >> host_0614_1136.log 2>&1"""
 
 
 
-openai.api_key = ""
-
-
-@dataclasses.dataclass
-class Prompt:
-    """A class for generating promp pattern"""
-
-    main_prompt: str
-    guest_type: List[str]
-    total_words_limit: List[int]
-    per_response_limit: List[int]
-    specialty: str
-    req_options: List[str]
-    gt_init: int = 0
-    total_init: int = 0
-    per_init: int = 0
-    opt_init: int = 0
-
-    type_pre: str = "\nGuest type: "
-    total_pre: str = "\nTotal words limit: "
-    per_pre: str = "\nMinimum words per response: "
-    special_pre: str = "\nSpecial requirements: "
-    # who_to_ask: str="\nWho to ask: Guest"
-    # who_to_answer: str="\nWho to answer: Robo"
-    req_pre: str = "\nCurrent request: in the "
-
-    def get_prompts(self):
-        strr = self.main_prompt
-        i = self.gt_init
-        while i < len(self.guest_type):
-            j = self.total_init
-            while j < len(self.total_words_limit):
-                k = self.per_init
-                while k < len(self.per_response_limit):
-                    m = self.opt_init
-                    while m < len(self.req_options):
-                        guest = self.type_pre + self.guest_type[i]
-                        total = self.total_pre + str(self.total_words_limit[j])
-                        per = self.per_pre + str(self.per_response_limit[k])
-                        special = self.special_pre + self.specialty
-                        req = self.req_pre + self.req_options[m]
-                        yield strr + guest + total + per + special + req, f"gt-{i}-total-{j}-per-{k}-opt-{m}"
-                        m += 1
-                    k += 1
-                j += 1
-            i += 1
+def add_rcpt_guide_arguments(parser):
+    parser.add_argument("--places-name", type=str,default="rcpt_places")
 
 
 @dataclasses.dataclass
@@ -64,8 +21,8 @@ class ChatLoop:
     log_path: str
     error_path: str
     conversation_id: List[str]
-    access_token: List[str]  # ?? using List + field?
-    begin_cnt: int = 1
+    access_token: List[str]  
+    begin_cnt: int = 1 # current beginning conversation id logged in .log
     openai_model: str = "gpt-3.5-turbo-16k"
     chatbots: List = None
     chatbot_num: int = 0
@@ -113,15 +70,8 @@ class ChatLoop:
         self.checker = 0
         self.chatbot_num = 1 - self.chatbot_num
 
-    async def start_async_chat(self, prompt_object: Prompt, logs: Set[str]):
-        chatbot_gmail = AsyncChatbot(
-            config={
-                "access_token": self.access_token[0],
-                "conversation_id": self.conversation_id[0],
-                # "model": "gpt-4"
-            }
-        )
-        chatbot_usc = AsyncChatbot(
+    async def start_async_chat(self, prompt_object: Rcpt_Guide_Prompt, logs: Set[str]):
+        chatbot_huang = AsyncChatbot(
             config={
                 "access_token": self.access_token[1],
                 "conversation_id": self.conversation_id[1],
@@ -135,7 +85,7 @@ class ChatLoop:
                 # "model": "gpt-4"
             }
         )
-        self.chatbots = [chatbot_shitao, chatbot_usc]
+        self.chatbots = [chatbot_shitao, chatbot_huang]
 
         # with open(self.log_path,'a') as log:
         # with open(self.output_path,'a') as f:
@@ -160,7 +110,7 @@ class ChatLoop:
                         continue
                     time.sleep(20)
 
-    def start_openai_chat(self, prompt_object: Prompt, logs: Set[str]):
+    def start_openai_chat(self, prompt_object: Rcpt_Guide_Prompt, logs: Set[str]):
         with open(self.output_path, "a") as f:
             cnt = self.begin_cnt
             for prompt, extra in prompt_object.get_prompts():
@@ -193,7 +143,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--output-file", type=str, default=rev_output)
-    parser.add_argument("--log", action="store_true", default=False)
+    parser.add_argument("--use-logged", action="store_true", default=False)
     parser.add_argument("--log-file", type=str, default=rev_log)
     parser.add_argument("--error-file", type=str, default=err_log)
     parser.add_argument("--openai", action="store_true", default=False)
@@ -203,15 +153,22 @@ if __name__ == "__main__":
     parser.add_argument("--ids-json-path",type=str,default=private_ids_json)
     # parser.add_argument("--rev-conv-id",type=str,default=conversation_id)
     # parser.add_argument("--base-dir", type=str, default=local)
+    
+
+    add_rcpt_guide_arguments(parser)
+
     args = parser.parse_args()
+    assert args.openai ^ args.revgpt, "Invalid: at least one of --openai or --revgpt must be true, and not both!"
 
     with open(args.params_json_path, "r") as f:
         params = json.load(f)
 
     with open(args.ids_json_path, "r") as f:
         ids = json.load(f)
+        if "openai_api_keys" in ids.keys():
+            openai.api_key = ids["openai_api_keys"]
 
-    if args.log:
+    if args.use_logged:
         if not os.path.exists(args.log_file):
             prev_req = set()
             file = open(args.log_file, "w")
@@ -237,8 +194,8 @@ if __name__ == "__main__":
     )
 
     gt = params["guest_type"]
-    req_opt = params["tour_places"]
-    prompts = Prompt(
+    req_opt = params[args.places_name]
+    prompts = Rcpt_Guide_Prompt(
         main_prompt=params[args.main_prompt_name],
         guest_type=gt,
         total_words_limit=params["total_words_limit"],
@@ -246,7 +203,7 @@ if __name__ == "__main__":
         specialty=params["specialty"],
         req_options=req_opt,
     )
-    print(f'prompt: {params[args.main_prompt_name]}')
+    print(f'args: {args}')
     print("----running----")
     try:
         if args.revgpt:

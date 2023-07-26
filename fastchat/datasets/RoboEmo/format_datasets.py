@@ -72,9 +72,13 @@ def main_json_dataset():
 
 @dataclass
 class revchatgpt2json:
+    json_file: str
+    part: str
+    begin_cnt: int
+    dataset_name: str
+    out_file: str
     roles: Dict = field(default_factory=lambda: {"human": 0, "gpt": 1})
     roles_inver: Dict = field(default_factory=lambda: {0: "human", 1: "gpt"})
-    dir: str = "./"
     users: List[str] = field(
         default_factory=lambda: ["Guest", "Old man", "Old Man", "President"]
     )
@@ -108,13 +112,13 @@ class revchatgpt2json:
             conv["conversations"].append({"from": from_who, "value": line})
         return conv
 
-    def main_revChatGPT_dataset(self):
-        """Format the string dataset into a valid json file"""
-        with open(self.dir + args.dataset_name, "r") as fread:
+    def make_vicuna_revChatGPT_dataset(self):
+        """Format the string dataset into a valid json file for vicuna finetuning"""
+        with open(self.dataset_name, "r") as fread:
             contents = fread.readlines()
             json_content = []
             conv = {}
-            id = args.begin_cnt
+            id = self.begin_cnt
             total_dia = 0
             last_role = -1
             for line in contents:
@@ -140,9 +144,8 @@ class revchatgpt2json:
             json.dump(
                 json_content,
                 open(
-                    self.dir
-                    + args.out_file
-                    + f'{total_dia}{"_part" if args.part else ""}.json',
+                    self.out_file
+                    + f'_{total_dia}{"_part" if self.part else ""}.json',
                     "w",
                 ),
                 indent=2,
@@ -151,7 +154,7 @@ class revchatgpt2json:
 
     def check_dataset(self):
         """Check dataset's validity"""
-        dataset = json.load(open(self.dir + args.json_file, "r"))
+        dataset = json.load(open(self.json_file, "r"))
         too_short = self.check_too_short(dataset)
         role_check = self.check_role_round(dataset)
         if too_short and role_check:
@@ -194,7 +197,7 @@ class revchatgpt2json:
 
     def combine_files(self, filenames):
         """Concat dataset files, preprocess the in-line BEGIN and END"""
-        with open(self.dir + args.out_file, "w") as f:
+        with open(self.out_file, "w") as f:
             for file in filenames:
                 lines = open(file, "r").readlines()
                 for line in lines:
@@ -215,10 +218,15 @@ class revchatgpt2json:
 
     def show_all_roles(self, filename):
         """Collect all the conversation roles used for future json parsing"""
-        with open(self.dir + filename, "r") as fread:
+        def compare(element):
+            return len(element)
+        with open(filename, "r") as fread:
             contents = fread.readlines()
             heads = []
             for content in contents:
+                speak = content.find(":")
+                if speak == -1:
+                    continue
                 head = content[0 : content.find(":")]
                 if (
                     head.find("No") == -1
@@ -227,12 +235,13 @@ class revchatgpt2json:
                     and head not in heads
                 ):
                     heads.append(head)
+        heads.sort(key=compare)
         for h in heads:
             print(h)
 
     def delete_before(self, num: int):
-        with open(self.dir + args.out_file + "concat", "w") as wf:
-            with open(self.dir + args.dataset_name, "r") as f:
+        with open(self.out_file + "concat", "w") as wf:
+            with open(self.dataset_name, "r") as f:
                 write = False
                 for line in f.readlines():
                     if write:
@@ -242,28 +251,48 @@ class revchatgpt2json:
                             print(line)
                             write = True
                             wf.write(line)
+    def delete_after(self, num: int):
+        with open(self.out_file + "concat", "w") as wf:
+            with open(self.dataset_name, "r") as f:
+                write = True
+                for line in f.readlines():
+                    if write:
+                        wf.write(line)
+                    if line.startswith("No"):
+                        if line == f"No {num}\n":
+                            print(line)
+                            break
 
+def add_arguments(parser):
+    parser.add_argument("--dataset-name", type=str, default="/data/Im-sys/FastChat/fastchat/datasets/RoboEmo/Host/Host_rev_add_davinci_0_5765")
+    parser.add_argument("--out-file", type=str, default="./output")
+    parser.add_argument("--json-file", type=str, default="/data/Im-sys/FastChat/fastchat/datasets/RoboEmo/Host/Host_24319_0_24407.json")
+    parser.add_argument("--begin-cnt", type=int, default=0)
+    parser.add_argument("--part", type=bool, default=False)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset-name", type=str, default="Host_")
-    parser.add_argument("--out-file", type=str, default="Host_combine")
-    parser.add_argument("--json-file", type=str, default="Host_16719.json")
-    parser.add_argument("--begin-cnt", type=int, default=0)
-    parser.add_argument("--part", type=bool, default=False)
+    add_arguments(parser)
     args = parser.parse_args()
 
-    rvjson = revchatgpt2json()
+    rvjson = revchatgpt2json(
+        dataset_name=args.dataset_name,
+        out_file=args.out_file,
+        json_file=args.json_file,
+        begin_cnt=args.begin_cnt,
+        part=args.part
+    )
 
     """Step one, gather all data, check the role's name and edit users[], bots[]"""
-    files = ["Host/Host",
-             "Host/Host_rev_add_davinci_from_5765",
-             "Host/Host_rev_chatGPT_davinci_6313_25200",]
-    rvjson.combine_files(files)
-    rvjson.show_all_roles(args.out_file)
+    # files = ["Host/Host",
+    #          "Host/Host_rev_add_davinci_from_5765",
+    #          "Host/Host_rev_chatGPT_davinci_6313_25200",]
+    # rvjson.combine_files(files,args.out_file)
+    # rvjson.show_all_roles(args.out_file)
+    rvjson.delete_before(5253)
 
     """Step two, format into json file"""
-    # rvjson.main_revChatGPT_dataset()
+    # rvjson.make_vicuna_revChatGPT_dataset()
 
     """Check dataset"""
     # print(rvjson.check_dataset())
