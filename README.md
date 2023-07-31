@@ -195,7 +195,8 @@ If the models do not show up, try to reboot the gradio web server.
 CUDA_VISIBLE_DEVICES=0 python3 -m fastchat.serve.model_worker --model-path lmsys/vicuna-7b-v1.3 --controller http://localhost:21001 --port 31000 --worker http://localhost:31000
 # worker 1
 CUDA_VISIBLE_DEVICES=1 python3 -m fastchat.serve.model_worker --model-path lmsys/fastchat-t5-3b-v1.0 --controller http://localhost:21001 --port 31001 --worker http://localhost:31001
-CUDA_VISIBLE_DEVICES=7 python -m fastchat.serve.model_worker --model-path /data/Weights/vicuna_13b_peft_lora --model-name vicuna-lora-13b --num-gpus 1 --port 21004 --controller http://0.0.0.0:21001 --worker-address http://0.0.0.0:21004
+CUDA_VISIBLE_DEVICES=6 python -m fastchat.serve.model_worker --model-path /data/vicuna_13b_lora_peft_host --model-name vicuna-lora-13b --num-gpus 1 --port 21003 --controller http://0.0.0.0:21001 --worker-address http://0.0.0.0:21003
+CUDA_VISIBLE_DEVICES=7 python -m fastchat.serve.model_worker --model-path /data/vicuna_7b_lora_peft_host_13357 --model-name vicuna-lora-7b --num-gpus 1 --port 21002 --controller http://0.0.0.0:21001 --worker-address http://0.0.0.0:21002
 ```
 - You can also launch a multi-tab gradio server, which includes the Chatbot Arena tabs.
 ```bash
