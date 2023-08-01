@@ -8,9 +8,8 @@ from revChatGPT.V1 import Chatbot, AsyncChatbot
 python gen_revChatGPT.py >> host_0614_1136.log 2>&1"""
 
 
-
 def add_rcpt_guide_arguments(parser):
-    parser.add_argument("--places-name", type=str,default="rcpt_places")
+    parser.add_argument("--places-name", type=str, default="rcpt_places")
 
 
 @dataclasses.dataclass
@@ -21,8 +20,8 @@ class ChatLoop:
     log_path: str
     error_path: str
     conversation_id: List[str]
-    access_token: List[str]  
-    begin_cnt: int = 1 # current beginning conversation id logged in .log
+    access_token: List[str]
+    begin_cnt: int = 1  # current beginning conversation id logged in .log
     openai_model: str = "gpt-3.5-turbo-16k"
     chatbots: List = None
     chatbot_num: int = 0
@@ -148,17 +147,18 @@ if __name__ == "__main__":
     parser.add_argument("--error-file", type=str, default=err_log)
     parser.add_argument("--openai", action="store_true", default=False)
     parser.add_argument("--revgpt", action="store_true", default=False)
-    parser.add_argument("--main-prompt-name", type=str,default="recp_main_prompt")
-    parser.add_argument("--params-json-path",type=str,default=params_path)
-    parser.add_argument("--ids-json-path",type=str,default=private_ids_json)
+    parser.add_argument("--main-prompt-name", type=str, default="recp_main_prompt")
+    parser.add_argument("--params-json-path", type=str, default=params_path)
+    parser.add_argument("--ids-json-path", type=str, default=private_ids_json)
     # parser.add_argument("--rev-conv-id",type=str,default=conversation_id)
     # parser.add_argument("--base-dir", type=str, default=local)
-    
 
     add_rcpt_guide_arguments(parser)
 
     args = parser.parse_args()
-    assert args.openai ^ args.revgpt, "Invalid: at least one of --openai or --revgpt must be true, and not both!"
+    assert (
+        args.openai ^ args.revgpt
+    ), "Invalid: at least one of --openai or --revgpt must be true, and not both!"
 
     with open(args.params_json_path, "r") as f:
         params = json.load(f)
@@ -203,7 +203,7 @@ if __name__ == "__main__":
         specialty=params["specialty"],
         req_options=req_opt,
     )
-    print(f'args: {args}')
+    print(f"args: {args}")
     print("----running----")
     try:
         if args.revgpt:

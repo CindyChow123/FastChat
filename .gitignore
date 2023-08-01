@@ -29,6 +29,7 @@ Conv*
 Rcpt*
 Prompts*
 test.py
+convs/
 
 # Docker
 *.yml

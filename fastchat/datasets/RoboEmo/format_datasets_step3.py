@@ -17,6 +17,6 @@ if __name__ == "__main__":
         out_file=args.out_file,
         json_file=args.json_file,
         begin_cnt=args.begin_cnt,
-        part=args.part
+        part=args.part,
     )
     print(rvjson.check_dataset())

@@ -144,8 +144,7 @@ class revchatgpt2json:
             json.dump(
                 json_content,
                 open(
-                    self.out_file
-                    + f'_{total_dia}{"_part" if self.part else ""}.json',
+                    self.out_file + f'_{total_dia}{"_part" if self.part else ""}.json',
                     "w",
                 ),
                 indent=2,
@@ -218,8 +217,10 @@ class revchatgpt2json:
 
     def show_all_roles(self, filename):
         """Collect all the conversation roles used for future json parsing"""
+
         def compare(element):
             return len(element)
+
         with open(filename, "r") as fread:
             contents = fread.readlines()
             heads = []
@@ -251,6 +252,7 @@ class revchatgpt2json:
                             print(line)
                             write = True
                             wf.write(line)
+
     def delete_after(self, num: int):
         with open(self.out_file + "concat", "w") as wf:
             with open(self.dataset_name, "r") as f:
@@ -263,12 +265,22 @@ class revchatgpt2json:
                             print(line)
                             break
 
+
 def add_arguments(parser):
-    parser.add_argument("--dataset-name", type=str, default="/data/Im-sys/FastChat/fastchat/datasets/RoboEmo/Host/Host_rev_add_davinci_0_5765")
+    parser.add_argument(
+        "--dataset-name",
+        type=str,
+        default="/data/Im-sys/FastChat/fastchat/datasets/RoboEmo/Host/Host_rev_add_davinci_0_5765",
+    )
     parser.add_argument("--out-file", type=str, default="./output")
-    parser.add_argument("--json-file", type=str, default="/data/Im-sys/FastChat/fastchat/datasets/RoboEmo/Host/Host_24319_0_24407.json")
+    parser.add_argument(
+        "--json-file",
+        type=str,
+        default="/data/Im-sys/FastChat/fastchat/datasets/RoboEmo/Host/Host_24319_0_24407.json",
+    )
     parser.add_argument("--begin-cnt", type=int, default=0)
     parser.add_argument("--part", type=bool, default=False)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -280,7 +292,7 @@ if __name__ == "__main__":
         out_file=args.out_file,
         json_file=args.json_file,
         begin_cnt=args.begin_cnt,
-        part=args.part
+        part=args.part,
     )
 
     """Step one, gather all data, check the role's name and edit users[], bots[]"""

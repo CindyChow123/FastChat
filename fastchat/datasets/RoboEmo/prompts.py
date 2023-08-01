@@ -1,6 +1,7 @@
 import asyncio, dataclasses, requests, openai, json, time, argparse, os, httpx
 from typing import List, Tuple, Any, Dict, Set, Optional
 
+
 @dataclasses.dataclass
 class Rcpt_Guide_Prompt:
     """A class for generating promp pattern"""
@@ -44,4 +45,3 @@ class Rcpt_Guide_Prompt:
                     k += 1
                 j += 1
             i += 1
-
