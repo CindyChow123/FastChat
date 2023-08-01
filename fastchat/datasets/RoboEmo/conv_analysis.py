@@ -5,18 +5,23 @@ def getStats(convs):
     left_cnt = 0
     tie_cnt = 0
     both_bad_cnt = 0
+    models = None
     for line in convs:
-        if line.find("leftvote") != -1:
+        # every line in this file is a json
+        cur_json = json.loads(line)
+        if models is None and "models" in cur_json.keys():
+            models = cur_json["models"]
+        if cur_json["type"] == "leftvote":
             left_cnt += 1
-        if line.find("rightvote") != -1:
+        elif cur_json["type"] == "rightvote":
             right_cnt += 1
-        if line.find("tievote") != -1:
+        elif cur_json["type"] == "tievote":
             tie_cnt += 1
-        if line.find("bothbad_vote") != -1:
+        elif cur_json["type"] == "bothbad_vote":
             both_bad_cnt += 1
     sum_cnt = right_cnt+left_cnt+tie_cnt+both_bad_cnt
     print(f'rightvote:{right_cnt}, leftvote:{left_cnt}, tievote:{tie_cnt}, bothbad_vote:{both_bad_cnt}')
-    print(f'right percentage:{((right_cnt+tie_cnt)/sum_cnt)*100}%, left percentage:{((left_cnt+tie_cnt)/sum_cnt)*100}%')
+    print(f'{models[0]} percentage:{((left_cnt+tie_cnt)/sum_cnt)*100}%, {models[1]} percentage:{((right_cnt+tie_cnt)/sum_cnt)*100}%')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
