@@ -134,9 +134,9 @@ if __name__ == "__main__":
 
     openai_output = "Host"
     openai_log = "host_rev_add_gpt4.log"
-    rev_output = "./temp/Host_rev_add_davinci_0713"
-    rev_log = "./temp/Host_rev_add_davinci_0713.log"
-    err_log = "./temp/Host_rev_add_davinci_0713_out.log"
+    rev_output = "./Rcpt/Host_rev_add_davinci_0713"
+    rev_log = "./Rcpt/Host_rev_add_davinci_0713.log"
+    err_log = "./Rcpt/Host_rev_add_davinci_0713_out.log"
     params_path = "./config/params.json"
     private_ids_json = "./config/private_ids.json"
 

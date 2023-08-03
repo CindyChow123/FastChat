@@ -9,8 +9,8 @@ def getStats(convs):
     for line in convs:
         # every line in this file is a json
         cur_json = json.loads(line)
-        if models is None and "models" in cur_json.keys():
-            models = cur_json["models"]
+        if models is None and "states" in cur_json.keys():
+            models = [cur_json["states"][0]["model_name"],cur_json["states"][1]["model_name"]]
         if cur_json["type"] == "leftvote":
             left_cnt += 1
         elif cur_json["type"] == "rightvote":
@@ -20,7 +20,7 @@ def getStats(convs):
         elif cur_json["type"] == "bothbad_vote":
             both_bad_cnt += 1
     sum_cnt = right_cnt+left_cnt+tie_cnt+both_bad_cnt
-    print(f'rightvote:{right_cnt}, leftvote:{left_cnt}, tievote:{tie_cnt}, bothbad_vote:{both_bad_cnt}')
+    print(f'{models[0]} vote:{left_cnt}, {models[1]} vote:{right_cnt}, tievote:{tie_cnt}, bothbad_vote:{both_bad_cnt}')
     print(f'{models[0]} percentage:{((left_cnt+tie_cnt)/sum_cnt)*100}%, {models[1]} percentage:{((right_cnt+tie_cnt)/sum_cnt)*100}%')
 
 if __name__ == "__main__":
