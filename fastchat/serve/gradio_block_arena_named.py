@@ -75,7 +75,7 @@ def load_demo_side_by_side_named(models, url_params):
     )
 
 
-def vote_last_response(states, vote_type, model_selectors, request: gr.Request):
+def vote_last_response(states,session_id, vote_type, model_selectors, request: gr.Request):
     with open(get_conv_log_filename(), "a") as fout:
         data = {
             "tstamp": round(time.time(), 4),
@@ -83,46 +83,47 @@ def vote_last_response(states, vote_type, model_selectors, request: gr.Request):
             "models": [x for x in model_selectors],
             "states": [x.dict() for x in states],
             "ip": request.client.host,
+            "session_id":session_id,
         }
         fout.write(json.dumps(data) + "\n")
 
 
 def leftvote_last_response(
-    state0, state1, model_selector0, model_selector1, request: gr.Request
+    state0, state1,session_id, model_selector0, model_selector1, request: gr.Request
 ):
     logger.info(f"leftvote (named). ip: {request.client.host}")
     vote_last_response(
-        [state0, state1], "leftvote", [model_selector0, model_selector1], request
+        [state0, state1],session_id, "leftvote", [model_selector0, model_selector1], request
     )
     return ("",) + (disable_btn,) * 4
 
 
 def rightvote_last_response(
-    state0, state1, model_selector0, model_selector1, request: gr.Request
+    state0, state1,session_id, model_selector0, model_selector1, request: gr.Request
 ):
     logger.info(f"rightvote (named). ip: {request.client.host}")
     vote_last_response(
-        [state0, state1], "rightvote", [model_selector0, model_selector1], request
+        [state0, state1],session_id, "rightvote", [model_selector0, model_selector1], request
     )
     return ("",) + (disable_btn,) * 4
 
 
 def tievote_last_response(
-    state0, state1, model_selector0, model_selector1, request: gr.Request
+    state0, state1,session_id, model_selector0, model_selector1, request: gr.Request
 ):
     logger.info(f"tievote (named). ip: {request.client.host}")
     vote_last_response(
-        [state0, state1], "tievote", [model_selector0, model_selector1], request
+        [state0, state1],session_id, "tievote", [model_selector0, model_selector1], request
     )
     return ("",) + (disable_btn,) * 4
 
 
 def bothbad_vote_last_response(
-    state0, state1, model_selector0, model_selector1, request: gr.Request
+    state0, state1,session_id, model_selector0, model_selector1, request: gr.Request
 ):
     logger.info(f"bothbad_vote (named). ip: {request.client.host}")
     vote_last_response(
-        [state0, state1], "bothbad_vote", [model_selector0, model_selector1], request
+        [state0, state1],session_id, "bothbad_vote", [model_selector0, model_selector1], request
     )
     return ("",) + (disable_btn,) * 4
 
@@ -140,11 +141,11 @@ def clear_history(request: gr.Request):
     return [None] * num_sides + [None] * num_sides + [""] + [disable_btn] * 6
 
 
-def share_click(state0, state1, model_selector0, model_selector1, request: gr.Request):
+def share_click(state0, state1,session_id, model_selector0, model_selector1, request: gr.Request):
     logger.info(f"share (named). ip: {request.client.host}")
     if state0 is not None and state1 is not None:
         vote_last_response(
-            [state0, state1], "share", [model_selector0, model_selector1], request
+            [state0, state1],session_id, "share", [model_selector0, model_selector1], request
         )
 
 
@@ -247,6 +248,7 @@ def add_text(
 def bot_response_multi(
     state0,
     state1,
+    session_id,
     temperature,
     top_p,
     max_new_tokens,
@@ -270,6 +272,7 @@ def bot_response_multi(
         gen.append(
             bot_response(
                 states[i],
+                session_id,
                 temperature,
                 top_p,
                 max_new_tokens,
@@ -409,29 +412,29 @@ By using this service, users are required to agree to the following terms: The s
     ]
     leftvote_btn.click(
         leftvote_last_response,
-        states + model_selectors,
+        states + [session_id] + model_selectors,
         [textbox, leftvote_btn, rightvote_btn, tie_btn, bothbad_btn],
     )
     rightvote_btn.click(
         rightvote_last_response,
-        states + model_selectors,
+        states + [session_id] + model_selectors,
         [textbox, leftvote_btn, rightvote_btn, tie_btn, bothbad_btn],
     )
     tie_btn.click(
         tievote_last_response,
-        states + model_selectors,
+        states + [session_id] + model_selectors,
         [textbox, leftvote_btn, rightvote_btn, tie_btn, bothbad_btn],
     )
     bothbad_btn.click(
         bothbad_vote_last_response,
-        states + model_selectors,
+        states + [session_id] + model_selectors,
         [textbox, leftvote_btn, rightvote_btn, tie_btn, bothbad_btn],
     )
     regenerate_btn.click(
         regenerate, states, states + chatbots + [textbox] + btn_list
     ).then(
         bot_response_multi,
-        states + [temperature, top_p, max_output_tokens],
+        states + [session_id, temperature, top_p, max_output_tokens],
         states + chatbots + btn_list,
     ).then(
         flash_buttons, [], btn_list
@@ -471,7 +474,7 @@ function (a, b, c, d) {
         states + chatbots + [textbox] + btn_list,
     ).then(
         bot_response_multi,
-        states + [temperature, top_p, max_output_tokens],
+        states + [session_id,temperature, top_p, max_output_tokens],
         states + chatbots + btn_list,
     ).then(
         flash_buttons, [], btn_list
@@ -482,7 +485,7 @@ function (a, b, c, d) {
         states + chatbots + [textbox] + btn_list,
     ).then(
         bot_response_multi,
-        states + [temperature, top_p, max_output_tokens],
+        states + [session_id,temperature, top_p, max_output_tokens],
         states + chatbots + btn_list,
     ).then(
         flash_buttons, [], btn_list
