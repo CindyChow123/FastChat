@@ -161,7 +161,9 @@ def load_demo(url_params, request: gr.Request):
     return load_demo_single(models, url_params, session_id)
 
 
-def vote_last_response(state,session_id, vote_type, model_selector, request: gr.Request):
+def vote_last_response(
+    state, session_id, vote_type, model_selector, request: gr.Request
+):
     with open(get_conv_log_filename(), "a") as fout:
         data = {
             "tstamp": round(time.time(), 4),
@@ -169,12 +171,12 @@ def vote_last_response(state,session_id, vote_type, model_selector, request: gr.
             "model": model_selector,
             "state": state.dict(),
             "ip": request.client.host,
-            "session_id":session_id,
+            "session_id": session_id,
         }
         fout.write(json.dumps(data) + "\n")
 
 
-def upvote_last_response(state,session_id, model_selector, request: gr.Request):
+def upvote_last_response(state, session_id, model_selector, request: gr.Request):
     logger.info(f"upvote. ip: {request.client.host}")
     vote_last_response(state, session_id, "upvote", model_selector, request)
     return ("",) + (disable_btn,) * 3
@@ -300,7 +302,9 @@ def model_worker_stream_iter(
             yield data
 
 
-def bot_response(state,session_id, temperature, top_p, max_new_tokens, request: gr.Request):
+def bot_response(
+    state, session_id, temperature, top_p, max_new_tokens, request: gr.Request
+):
     logger.info(f"bot_response. ip: {request.client.host}")
     start_tstamp = time.time()
     temperature = float(temperature)
@@ -442,7 +446,7 @@ def bot_response(state,session_id, temperature, top_p, max_new_tokens, request: 
             "finish": round(finish_tstamp, 4),
             "state": state.dict(),
             "ip": request.client.host,
-            "session_id": session_id
+            "session_id": session_id,
         }
         fout.write(json.dumps(data) + "\n")
 
@@ -597,7 +601,7 @@ By using this service, users are required to agree to the following terms: The s
     )
     regenerate_btn.click(regenerate, state, [state, chatbot, textbox] + btn_list).then(
         bot_response,
-        [state,session_id, temperature, top_p, max_output_tokens],
+        [state, session_id, temperature, top_p, max_output_tokens],
         [state, chatbot] + btn_list,
     )
     clear_btn.click(clear_history, None, [state, chatbot, textbox] + btn_list)
@@ -619,7 +623,7 @@ By using this service, users are required to agree to the following terms: The s
         [state, session_id, chatbot, textbox] + btn_list,
     ).then(
         bot_response,
-        [state,session_id, temperature, top_p, max_output_tokens],
+        [state, session_id, temperature, top_p, max_output_tokens],
         [state, chatbot] + btn_list,
     )
 
